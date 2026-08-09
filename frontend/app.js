@@ -11,12 +11,15 @@ const analyzeTextBtn = document.getElementById('analyze-text-btn');
 const loader = document.getElementById('loader');
 const resultsDiv = document.getElementById('results');
 
+// CANLI BACKEND URL'N BURASI (Render'dan aldığın adresle değiştir)
+const API_URL = "https://document-analysis-ai.onrender.com";
+
 // Sekme Değiştirme Mantığı
 tabPdf.addEventListener('click', () => {
-    tabPdf.classList.add('text-blue-600', 'border-blue-600');
-    tabPdf.classList.remove('text-gray-400', 'border-transparent');
-    tabText.classList.add('text-gray-400', 'border-transparent');
-    tabText.classList.remove('text-blue-600', 'border-blue-600');
+    tabPdf.classList.add('text-blue-400', 'border-blue-500');
+    tabPdf.classList.remove('text-slate-500', 'border-transparent');
+    tabText.classList.add('text-slate-500', 'border-transparent');
+    tabText.classList.remove('text-blue-400', 'border-blue-500');
     
     pdfSection.classList.remove('hidden');
     textSection.classList.add('hidden');
@@ -24,10 +27,10 @@ tabPdf.addEventListener('click', () => {
 });
 
 tabText.addEventListener('click', () => {
-    tabText.classList.add('text-blue-600', 'border-blue-600');
-    tabText.classList.remove('text-gray-400', 'border-transparent');
-    tabPdf.classList.add('text-gray-400', 'border-transparent');
-    tabPdf.classList.remove('text-blue-600', 'border-blue-600');
+    tabText.classList.add('text-blue-400', 'border-blue-500');
+    tabText.classList.remove('text-slate-500', 'border-transparent');
+    tabPdf.classList.add('text-slate-500', 'border-transparent');
+    tabPdf.classList.remove('text-blue-400', 'border-blue-500');
     
     textSection.classList.remove('hidden');
     pdfSection.classList.add('hidden');
@@ -39,15 +42,15 @@ dropZone.addEventListener('click', () => fileInput.click());
 
 dropZone.addEventListener('dragover', (e) => {
     e.preventDefault();
-    dropZone.classList.add('border-blue-500', 'bg-blue-50');
+    dropZone.classList.add('border-blue-500', 'bg-slate-800/50');
 });
 dropZone.addEventListener('dragleave', () => {
-    dropZone.classList.remove('border-blue-500', 'bg-blue-50');
+    dropZone.classList.remove('border-blue-500', 'bg-slate-800/50');
 });
 
 dropZone.addEventListener('drop', (e) => {
     e.preventDefault();
-    dropZone.classList.remove('border-blue-500', 'bg-blue-50');
+    dropZone.classList.remove('border-blue-500', 'bg-slate-800/50');
     if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
 });
 
@@ -67,7 +70,7 @@ async function handleFile(file) {
     formData.append("file", file);
 
     try {
-        const response = await fetch("http://127.0.0.1:8000/analyze-pdf", {
+        const response = await fetch(`${API_URL}/analyze-pdf`, {
             method: "POST",
             body: formData
         });
@@ -92,7 +95,7 @@ analyzeTextBtn.addEventListener('click', async () => {
     setLoading(true);
 
     try {
-        const response = await fetch("http://127.0.0.1:8000/analyze-text", {
+        const response = await fetch(`${API_URL}/analyze-text`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
@@ -128,33 +131,26 @@ function setLoading(isLoading) {
 function displayResults(data) {
     loader.classList.add('hidden');
     
-    const riskColors = {
-        "High": "bg-red-100 text-red-800 border-red-200",
-        "Medium": "bg-yellow-100 text-yellow-800 border-yellow-200",
-        "Low": "bg-green-100 text-green-800 border-green-200"
-    };
-    const riskClass = riskColors[data.risk_level] || "bg-gray-100 text-gray-800 border-gray-200";
-
     resultsDiv.innerHTML = `
         <div class="grid grid-cols-2 gap-4">
-            <div class="p-4 rounded-lg border bg-gray-50">
-                <h3 class="text-sm font-semibold text-gray-500 uppercase">Kategori</h3>
-                <p class="text-xl font-bold text-gray-800 mt-1">${data.category}</p>
+            <div class="p-4 rounded-xl border border-slate-800 bg-slate-950">
+                <h3 class="text-sm font-semibold text-slate-400 uppercase">Kategori</h3>
+                <p class="text-xl font-bold text-slate-200 mt-1">${data.category}</p>
             </div>
-            <div class="p-4 rounded-lg border ${riskClass}">
-                <h3 class="text-sm font-semibold uppercase">Risk Seviyesi</h3>
-                <p class="text-xl font-bold mt-1">${data.risk_level} (Skor: ${data.risk_score})</p>
+            <div class="p-4 rounded-xl border border-slate-800 bg-slate-950">
+                <h3 class="text-sm font-semibold text-slate-400 uppercase">Risk Seviyesi</h3>
+                <p class="text-xl font-bold text-blue-400 mt-1">${data.risk_level} (Skor: ${data.risk_score})</p>
             </div>
         </div>
-        <div class="p-4 rounded-lg border bg-blue-50 border-blue-100">
-            <h3 class="text-sm font-semibold text-blue-800 uppercase mb-2">Anahtar Kelimeler</h3>
+        <div class="p-4 rounded-xl border border-slate-800 bg-slate-950">
+            <h3 class="text-sm font-semibold text-slate-400 uppercase mb-2">Anahtar Kelimeler</h3>
             <div class="flex flex-wrap gap-2">
-                ${data.keywords.map(kw => `<span class="px-3 py-1 bg-white text-blue-600 rounded-full text-sm shadow-sm">${kw}</span>`).join('')}
+                ${data.keywords.map(kw => `<span class="px-3 py-1 bg-slate-900 border border-slate-800 text-blue-400 rounded-lg text-sm">${kw}</span>`).join('')}
             </div>
         </div>
-        <div class="p-4 rounded-lg border bg-gray-50">
-            <h3 class="text-sm font-semibold text-gray-500 uppercase mb-2">Yapay Zeka Özeti</h3>
-            <p class="text-gray-700 leading-relaxed">${data.summary}</p>
+        <div class="p-4 rounded-xl border border-slate-800 bg-slate-950">
+            <h3 class="text-sm font-semibold text-slate-400 uppercase mb-2">Yapay Zeka Özeti</h3>
+            <p class="text-slate-300 leading-relaxed">${data.summary}</p>
         </div>
         <button onclick="location.reload()" class="w-full py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-500 transition font-medium shadow-lg shadow-blue-600/30">Yeni Analiz Yap</button>
     `;
