@@ -1,7 +1,7 @@
 from transformers import pipeline
 
-print("Sınıflandırma modeli yükleniyor...")
-classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+print("Sınıflandırma modeli yükleniyor... (Bellek dostu DistilBART-MNLI)")
+classifier = pipeline("zero-shot-classification", model="valhalla/distilbart-mnli-12-1")
 
 CATEGORIES = [
     "Technology", 
