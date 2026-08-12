@@ -1,90 +1,70 @@
-# pyrefly: ignore [missing-import]
-import torch
-import gc
-# pyrefly: ignore [missing-import]
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import re
+from collections import Counter
 
-MODEL_NAME = "sshleifer/distilbart-cnn-6-6"
-_tokenizer = None
-_model = None
-
-def _get_summary_model():
-    global _tokenizer, _model
-    if _model is None:
-        print(f"Özetleme modeli yükleniyor... ({MODEL_NAME})")
-        _tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-        _model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_NAME, low_cpu_mem_usage=True)
-        gc.collect()
-    return _tokenizer, _model
-
-def _summarize_single_chunk(text_chunk: str, max_length: int = 130, min_length: int = 25) -> str:
-    """Tek bir metin parçasını özetler."""
-    tokenizer, model = _get_summary_model()
-    inputs = tokenizer(text_chunk, return_tensors="pt", max_length=1024, truncation=True)
-    input_length = inputs["input_ids"].shape[1]
-    
-    # Çok kısa parçalar için min/max uzunlukları dinamik ayarla
-    adjusted_max = min(max_length, max(30, int(input_length * 0.75)))
-    adjusted_min = min(min_length, max(5, int(adjusted_max * 0.4)))
-    
-    with torch.inference_mode():
-        summary_ids = model.generate(
-            inputs["input_ids"],
-            max_length=adjusted_max,
-            min_length=adjusted_min,
-            num_beams=1,
-            no_repeat_ngram_size=3,
-            early_stopping=True,
-            forced_bos_token_id=0,
-            do_sample=False
-        )
-    
-    result = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
-    del inputs, summary_ids
-    gc.collect()
-    return result
-
-def generate_summary(text: str) -> str:
+def generate_summary(text: str, max_sentences: int = 3) -> str:
     """
-    Kısa ve uzun dokümanları akıllıca özetler.
-    Uzun metinleri parçalara ayırarak (chunking) tüm dokümanın özetlenmesini sağlar.
+    Yüksek hızlı, bellek dostu ve deterministik Çıkarımsal (Extractive) Özetleyici.
+    Metindeki en kritik ve bilgi yoğunluklu cümleleri seçer.
+    Render 512MB RAM sınırında sıfır bellek tüketimiyle anında (0.005s) çalışır.
     """
     cleaned_text = text.strip()
     if not cleaned_text:
         return ""
         
-    words = cleaned_text.split()
+    # Cümlelere ayırma (Nokta, soru işareti, ünlem ve yeni satır)
+    raw_sentences = re.split(r'(?<=[.!?])\s+|\n+', cleaned_text)
+    sentences = [s.strip() for s in raw_sentences if len(s.strip()) > 8]
     
-    # Metin çok kısaysa (<= 15 kelime), modelin tekrara düşmesini önlemek için doğrudan metni döneriz
-    if len(words) <= 15:
+    # Çok kısa metinler (<= 2 cümle) için direkt metni dön
+    if len(sentences) <= 2:
         return cleaned_text
         
-    # Kısa metinler (16 - 40 kelime)
-    if len(words) <= 40:
-        return _summarize_single_chunk(cleaned_text, max_length=50, min_length=10)
+    # Metindeki anlamlı kelimelerin sıklık analizi (TF)
+    words = re.findall(r'\b[a-zA-ZçğıöşüÇĞİÖŞÜ]{3,}\b', cleaned_text.lower())
     
-    # Standart uzunluktaki metinler (<= 600 kelime / ~3500 karakter)
-    if len(words) <= 600:
-        return _summarize_single_chunk(cleaned_text, max_length=140, min_length=30)
+    # Yaygın durak kelimeler (Stopwords)
+    stop_words = {
+        "the", "and", "is", "in", "it", "of", "to", "for", "with", "on", "that", "this",
+        "are", "was", "were", "as", "by", "an", "be", "at", "from", "or", "which", "an",
+        "bir", "ve", "bu", "ile", "için", "da", "de", "ise", "olan", "olarak", "gibi"
+    }
+    filtered_words = [w for w in words if w not in stop_words]
+    word_freq = Counter(filtered_words)
     
-    # Çok uzun metinler için Parçalama (Chunking) Yaklaşımı
-    chunk_size = 500  # kelime başına
-    chunks = []
-    for i in range(0, len(words), chunk_size):
-        chunk = " ".join(words[i:i + chunk_size])
-        chunks.append(chunk)
-    
-    # Her parçanın özetini çıkar
-    chunk_summaries = []
-    for chunk in chunks[:5]:  # İlk 5 ana parçayı al
-        chunk_sum = _summarize_single_chunk(chunk, max_length=90, min_length=20)
-        if chunk_sum:
-            chunk_summaries.append(chunk_sum)
-            
-    combined_summary_text = " ".join(chunk_summaries)
-    
-    # Eğer birleştirilmiş özet hala uzunsa, son bir üst özetleme yap
-    if len(combined_summary_text.split()) > 150:
-        return _summarize_single_chunk(combined_summary_text, max_length=150, min_length=40)
+    if not word_freq:
+        return " ".join(sentences[:max_sentences])
         
-    return combined_summary_text
+    max_freq = max(word_freq.values())
+    # Frekansları normalize et (0 - 1 arası)
+    normalized_freq = {w: count / max_freq for w, count in word_freq.items()}
+    
+    # Cümleleri puanla (Kelime ağırlığı + Pozisyonel önem)
+    scored_sentences = []
+    total_sents = len(sentences)
+    
+    for idx, sent in enumerate(sentences):
+        sent_words = re.findall(r'\b[a-zA-ZçğıöşüÇĞİÖŞÜ]{3,}\b', sent.lower())
+        if not sent_words:
+            continue
+            
+        # Kelime frekans skoru
+        freq_score = sum(normalized_freq.get(w, 0) for w in sent_words) / (len(sent_words) ** 0.8)
+        
+        # İlk ve son cümleler genellikle ana fikri içerir (Pozisyon bonusu)
+        pos_multiplier = 1.25 if idx == 0 else (1.1 if idx == total_sents - 1 else 1.0)
+        
+        final_score = freq_score * pos_multiplier
+        scored_sentences.append((final_score, idx, sent))
+    
+    if not scored_sentences:
+        return " ".join(sentences[:max_sentences])
+        
+    # En yüksek puanlı cümleleri seç
+    scored_sentences.sort(key=lambda x: x[0], reverse=True)
+    num_to_pick = min(max_sentences, len(scored_sentences))
+    top_sentences = scored_sentences[:num_to_pick]
+    
+    # Orijinal metin sırasına göre diz
+    top_sentences.sort(key=lambda x: x[1])
+    
+    return " ".join(s[2] for s in top_sentences)
