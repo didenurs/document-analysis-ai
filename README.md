@@ -1,40 +1,91 @@
 # AI-Powered Document Analysis and Risk Assessment System
 
-This project is a RESTful API built with **FastAPI** that leverages advanced Natural Language Processing (NLP) and Transformer models to automatically analyze text and PDF documents. The system extracts summaries, identifies key phrases, predicts document categories, and calculates potential risk levels.
+Bu proje, yüklenen **PDF** belgelerini ve **düz metinleri** gelişmiş Doğal Dil İşleme (NLP) ve Transformer modelleri kullanarak analiz eden, özetleyen, kategorize eden, anahtar kelimelerini çıkaran ve güvenlik risk skorunu hesaplayan bir **FastAPI** backend ve **Modern Web Arayüzü** projesidir.
 
 ---
 
-## Features
+## 🚀 Özellikler
 
-* ** PDF & Text Processing:** Handles both raw text inputs and PDF file uploads (via `PyMuPDF`).
-* ** Text Summarization:** Uses Hugging Face's `facebook/bart-large-cnn` model to generate concise summaries of long documents.
-* ** Keyword Extraction:** Extracts the most relevant semantic keywords and n-grams using `KeyBERT`.
-* ** Zero-Shot Classification:** Categorizes documents into predefined classes (e.g., *Cyber Security, Technology, Finance, Healthcare, Education*) using `facebook/bart-large-mnli` without requiring domain-specific training data.
-* ** Risk Assessment:** A rule-based engine that scans for critical threat indicators and calculates a risk score (Low, Medium, High).
-* ** Interactive API Docs:** Auto-generated Swagger UI integration for easy testing and frontend integration.
-
----
-
-## Technology Stack
-
-* **Language:** Python 3.12+
-* **Backend Framework:** FastAPI, Uvicorn
-* **AI / NLP Models:** HuggingFace Transformers, KeyBERT, Sentence-Transformers
-* **Data Processing:** Pandas, NumPy, PyTorch
-* **Document Parsing:** PyMuPDF (fitz)
+* **📄 PDF & Metin İşleme:** Düz metin ve PDF dosyalarından (`PyMuPDF`) metin çıkarma ve ön işleme.
+* **📝 Akıllı Özetleme (Smart Summarization):** Hugging Face `sshleifer/distilbart-cnn-12-6` modeli ve uzun metinler için parçalama (chunking) algoritması ile kayıpsız özetleme.
+* **🔑 Anahtar Kelime Çıkarımı:** `KeyBERT` (Sentence-Transformers) ile semantik anahtar kelimeler ve n-gram'lar çıkarma.
+* **📁 Sıfır Örnekli Sınıflandırma (Zero-Shot Classification):** `valhalla/distilbart-mnli-12-1` modeli ile metinleri önceden tanımlanmış kategorilere (*Technology, Finance, Healthcare, Cyber Security, Education*) ayırma.
+* **🛡️ Güvenlik ve Risk Değerlendirmesi:** Regex kelime sınırları (`\b`) ve ağırlıklı tehdit göstergeleriyle risk seviyesi (*Low, Medium, High*) ve puanı hesaplama.
+* **💻 Modern Kullanıcı Arayüzü:** TailwindCSS, dark mode neon teması ve sürükle-bırak PDF yükleme desteği olan tek sayfalık web arayüzü.
+* **🧪 Kapsamlı Test Takımı:** `pytest` ile tüm servisleri ve API endpoint'lerini kapsayan birim ve entegrasyon testleri.
 
 ---
 
-## Project Architecture
+## 🛠️ Teknoloji Yığını
 
-The project follows a modular, layered architecture (Single Responsibility Principle) to ensure scalability and maintainability:
+* **Programlama Dili:** Python 3.12+
+* **Backend:** FastAPI, Uvicorn, Pydantic
+* **Yapay Zeka & NLP:** HuggingFace Transformers, PyTorch, KeyBERT, Sentence-Transformers
+* **Doküman İşleme:** PyMuPDF (`fitz`)
+* **Test:** Pytest, HTTPX
+* **Frontend:** HTML5, TailwindCSS, Vanilla JS, CSS3 Animations
+
+---
+
+## 📁 Proje Mimarisi
 
 ```text
 document-analysis-ai/
 ├── app/
-│   ├── api/            # API endpoints and route definitions
-│   ├── services/       # Core business logic and AI model inference
-│   ├── models/         # Pydantic schemas for data validation
-│   └── utils/          # Helper functions (e.g., text cleaning)
-├── requirements.txt    # Project dependencies
+│   ├── api/
+│   │   └── routes.py           # FastAPI rotaları (/health, /analyze-text, /analyze-pdf)
+│   ├── models/
+│   │   └── schemas.py          # Pydantic veri modelleri (Request & Response)
+│   ├── services/
+│   │   ├── category_service.py # Zero-Shot sınıflandırma servisi
+│   │   ├── keyword_service.py  # KeyBERT anahtar kelime servisi
+│   │   ├── pdf_service.py      # PDF metin ayrıştırma servisi
+│   │   ├── risk_service.py     # Risk değerlendirme ve puanlama motoru
+│   │   └── summary_service.py  # Akıllı chunking destekli özetleme servisi
+│   ├── utils/
+│   │   └── text_cleaner.py     # Metin temizleme yardımcı fonksiyonları
+│   └── main.py                 # FastAPI ana uygulama ve CORS yapılandırması
+├── frontend/
+│   ├── index.html              # Modern Web Arayüzü
+│   ├── style.css               # Neon teması ve özel animasyonlar
+│   └── app.js                  # Frontend API bağlantısı ve etkileşim mantığı
+├── tests/
+│   ├── test_api.py             # API entegrasyon testleri
+│   ├── test_services.py        # NLP ve servis birim testleri
+│   ├── analyze-pdf.pdf         # Test PDF dosyası
+│   └── analyze-text.txt        # Test metin dosyası
+├── pytest.ini                  # Pytest yapılandırması
+├── requirements.txt            # Python bağımlılıkları (UTF-8)
 └── README.md
+```
+
+---
+
+## 💻 Kurulum ve Çalıştırma
+
+### 1. Sanal Ortamı Hazırlama ve Bağımlılıkları Yükleme
+```bash
+# Sanal ortam oluşturma
+python -m venv venv
+
+# Sanal ortamı aktif etme (Windows)
+.\venv\Scripts\activate
+
+# Bağımlılıkları yükleme
+pip install -r requirements.txt
+```
+
+### 2. Backend API'yi Başlatma
+```bash
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+* **Swagger API Dokümantasyonu:** `http://127.0.0.1:8000/docs`
+* **Health Check:** `http://127.0.0.1:8000/health`
+
+### 3. Web Arayüzünü Açma
+`frontend/index.html` dosyasını tarayıcınızda açabilir veya yerel bir canlı sunucu (`Live Server` / `python -m http.server`) ile görüntüleyebilirsiniz.
+
+### 4. Testleri Çalıştırma
+```bash
+pytest -v
+```

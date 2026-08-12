@@ -1,5 +1,7 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from app.api.routes import router
 
 app = FastAPI(
@@ -8,7 +10,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Güvenlik için CORS ayarları (Frontend eklenecekse burası önemli)
+# CORS ayarları
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -17,5 +19,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Endpointlerimizi ana uygulamaya bağlıyoruz
+# API Endpoint'leri
 app.include_router(router)
+
+# Frontend statik dosyalarını kök dizinden sunma (Tek komutla hem API hem UI)
+frontend_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
+if os.path.exists(frontend_path):
+    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")

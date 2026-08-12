@@ -14,23 +14,29 @@ def health_check():
     return {"status": "ok", "message": "AI Analysis Service is running!"}
 
 def process_text_pipeline(raw_text: str) -> AnalysisResponse:
+    if not raw_text or not raw_text.strip():
+        raise HTTPException(status_code=400, detail="Metin içeriği boş olamaz.")
+        
     cleaned_text = clean_text(raw_text)
     
     if not cleaned_text:
-         raise HTTPException(status_code=400, detail="Metin içeriği boş olamaz.")
+        raise HTTPException(status_code=400, detail="Metin içeriği geçerli karakter barındırmıyor.")
 
-    summary = generate_summary(cleaned_text)
-    keywords = extract_keywords(cleaned_text)
-    category = predict_category(cleaned_text)
-    risk_data = analyze_risk(cleaned_text)
+    try:
+        summary = generate_summary(cleaned_text)
+        keywords = extract_keywords(cleaned_text)
+        category = predict_category(cleaned_text)
+        risk_data = analyze_risk(cleaned_text)
 
-    return AnalysisResponse(
-        summary=summary,
-        keywords=keywords,
-        category=category,
-        risk_level=risk_data["risk_level"],
-        risk_score=risk_data["risk_score"]
-    )
+        return AnalysisResponse(
+            summary=summary,
+            keywords=keywords,
+            category=category,
+            risk_level=risk_data["risk_level"],
+            risk_score=risk_data["risk_score"]
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Analiz sırasında bir sunucu hatası oluştu: {str(e)}")
 
 @router.post("/analyze-text", response_model=AnalysisResponse)
 def analyze_text(request: TextAnalysisRequest):
@@ -38,9 +44,24 @@ def analyze_text(request: TextAnalysisRequest):
 
 @router.post("/analyze-pdf", response_model=AnalysisResponse)
 async def analyze_pdf(file: UploadFile = File(...)):
-    if not file.filename.endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="Sadece PDF dosyaları yükleyebilirsiniz.")
+    if not file.filename or not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Lütfen geçerli bir PDF dosyası yükleyin.")
     
-    file_bytes = await file.read()
-    raw_text = extract_text_from_pdf(file_bytes)
+    try:
+        file_bytes = await file.read()
+        if len(file_bytes) == 0:
+            raise HTTPException(status_code=400, detail="Yüklenen PDF dosyası boş.")
+            
+        raw_text = extract_text_from_pdf(file_bytes)
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"PDF dosyası okunamadı: {str(e)}")
+        
+    if not raw_text.strip():
+        raise HTTPException(
+            status_code=400, 
+            detail="PDF dosyasından okunabilir metin çıkarılamadı. Dosya boş veya taranmış bir resim dokümanı olabilir."
+        )
+    
     return process_text_pipeline(raw_text)

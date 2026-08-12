@@ -12,7 +12,18 @@ CATEGORIES = [
 ]
 
 def predict_category(text: str) -> str:
-    # Metni belirli kategorilerle sınıflandır
-    result = classifier(text, candidate_labels=CATEGORIES)
-    # En yüksek skora sahip kategoriyi döndür
-    return result['labels'][0]
+    """
+    Sıfır örnekli (zero-shot) sınıflandırma ile metnin kategorisini belirler.
+    """
+    if not text or not text.strip():
+        return "General"
+        
+    # Sınıflandırma için ilk 1500 karakter yeterlidir ve token taşmasını önler
+    truncated_text = text[:1500]
+    
+    try:
+        result = classifier(truncated_text, candidate_labels=CATEGORIES)
+        return result['labels'][0]
+    except Exception as e:
+        print(f"Kategori tahmin uyarısı: {e}")
+        return "General"
