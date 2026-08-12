@@ -1,7 +1,15 @@
 from keybert import KeyBERT
+import gc
 
-print("KeyBERT modeli yükleniyor...")
-kw_model = KeyBERT()
+_kw_model = None
+
+def _get_kw_model():
+    global _kw_model
+    if _kw_model is None:
+        print("KeyBERT modeli yükleniyor... (all-MiniLM-L6-v2)")
+        _kw_model = KeyBERT(model="all-MiniLM-L6-v2")
+        gc.collect()
+    return _kw_model
 
 def extract_keywords(text: str, top_n: int = 5) -> list:
     """
@@ -11,6 +19,7 @@ def extract_keywords(text: str, top_n: int = 5) -> list:
         return []
         
     try:
+        kw_model = _get_kw_model()
         keywords = kw_model.extract_keywords(
             text, 
             keyphrase_ngram_range=(1, 2), 

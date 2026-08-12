@@ -1,7 +1,8 @@
 from transformers import pipeline
+import gc
 
-print("Sınıflandırma modeli yükleniyor... (Bellek dostu DistilBART-MNLI)")
-classifier = pipeline("zero-shot-classification", model="valhalla/distilbart-mnli-12-1")
+MODEL_NAME = "typeform/distilbert-base-uncased-mnli"
+_classifier = None
 
 CATEGORIES = [
     "Technology", 
@@ -11,6 +12,17 @@ CATEGORIES = [
     "Education"
 ]
 
+def _get_classifier():
+    global _classifier
+    if _classifier is None:
+        print(f"Sınıflandırma modeli yükleniyor... ({MODEL_NAME})")
+        _classifier = pipeline(
+            "zero-shot-classification", 
+            model=MODEL_NAME
+        )
+        gc.collect()
+    return _classifier
+
 def predict_category(text: str) -> str:
     """
     Sıfır örnekli (zero-shot) sınıflandırma ile metnin kategorisini belirler.
@@ -18,10 +30,11 @@ def predict_category(text: str) -> str:
     if not text or not text.strip():
         return "General"
         
-    # Sınıflandırma için ilk 1500 karakter yeterlidir ve token taşmasını önler
-    truncated_text = text[:1500]
+    # Sınıflandırma için ilk 1000 karakter yeterlidir ve token taşmasını önler
+    truncated_text = text[:1000]
     
     try:
+        classifier = _get_classifier()
         result = classifier(truncated_text, candidate_labels=CATEGORIES)
         return result['labels'][0]
     except Exception as e:

@@ -1,15 +1,25 @@
-
+# pyrefly: ignore [missing-import]
 import torch
+import gc
+# pyrefly: ignore [missing-import]
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-print("Özetleme modeli yükleniyor... (Bellek dostu DistilBART)")
-model_name = "sshleifer/distilbart-cnn-12-6"
+MODEL_NAME = "sshleifer/distilbart-cnn-6-6"
+_tokenizer = None
+_model = None
 
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+def _get_summary_model():
+    global _tokenizer, _model
+    if _model is None:
+        print(f"Özetleme modeli yükleniyor... ({MODEL_NAME})")
+        _tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+        _model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_NAME, low_cpu_mem_usage=True)
+        gc.collect()
+    return _tokenizer, _model
 
 def _summarize_single_chunk(text_chunk: str, max_length: int = 130, min_length: int = 25) -> str:
     """Tek bir metin parçasını özetler."""
+    tokenizer, model = _get_summary_model()
     inputs = tokenizer(text_chunk, return_tensors="pt", max_length=1024, truncation=True)
     input_length = inputs["input_ids"].shape[1]
     
@@ -22,9 +32,10 @@ def _summarize_single_chunk(text_chunk: str, max_length: int = 130, min_length: 
             inputs["input_ids"],
             max_length=adjusted_max,
             min_length=adjusted_min,
-            num_beams=4,
+            num_beams=2,
             no_repeat_ngram_size=3,
             early_stopping=True,
+            forced_bos_token_id=0,
             do_sample=False
         )
     
