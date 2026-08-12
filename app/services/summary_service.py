@@ -52,9 +52,13 @@ def generate_summary(text: str) -> str:
         
     words = cleaned_text.split()
     
-    # Metin zaten çok kısaysa (< 30 kelime), özet üretmek yerine direkt metni veya hafif özetini dönebiliriz
-    if len(words) < 30:
-        return _summarize_single_chunk(cleaned_text, max_length=60, min_length=10)
+    # Metin çok kısaysa (<= 15 kelime), modelin tekrara düşmesini önlemek için doğrudan metni döneriz
+    if len(words) <= 15:
+        return cleaned_text
+        
+    # Kısa metinler (16 - 40 kelime)
+    if len(words) <= 40:
+        return _summarize_single_chunk(cleaned_text, max_length=50, min_length=10)
     
     # Standart uzunluktaki metinler (<= 600 kelime / ~3500 karakter)
     if len(words) <= 600:
