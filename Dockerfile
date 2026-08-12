@@ -25,16 +25,14 @@ RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/wh
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Pre-download & cache models in the Docker image during build time
-# (This ensures the container never spends time/RAM downloading models at runtime)
+# Pre-download & cache lightweight models in the Docker image during build time
 RUN python -c "\
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline; \
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM; \
 from keybert import KeyBERT; \
 AutoTokenizer.from_pretrained('sshleifer/distilbart-cnn-6-6'); \
 AutoModelForSeq2SeqLM.from_pretrained('sshleifer/distilbart-cnn-6-6'); \
-pipeline('zero-shot-classification', model='typeform/distilbert-base-uncased-mnli'); \
 KeyBERT(model='all-MiniLM-L6-v2'); \
-print('All models successfully baked into Docker image!'); \
+print('Models baked into Docker image successfully!'); \
 "
 
 # Copy project files

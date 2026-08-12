@@ -1,42 +1,66 @@
-from transformers import pipeline
-import gc
+import re
 
-MODEL_NAME = "typeform/distilbert-base-uncased-mnli"
-_classifier = None
-
-CATEGORIES = [
-    "Technology", 
-    "Finance", 
-    "Healthcare", 
-    "Cyber Security", 
-    "Education"
-]
-
-def _get_classifier():
-    global _classifier
-    if _classifier is None:
-        print(f"Sınıflandırma modeli yükleniyor... ({MODEL_NAME})")
-        _classifier = pipeline(
-            "zero-shot-classification", 
-            model=MODEL_NAME
-        )
-        gc.collect()
-    return _classifier
+# Genişletilmiş ve ağırlıklandırılmış kategori sözlüğü
+CATEGORY_KEYWORDS = {
+    "Cyber Security": [
+        "vulnerability", "breach", "attack", "malware", "hack", "zero-day", "firewall", 
+        "leak", "cyber", "confidential", "incident", "unauthorized", "credential", 
+        "ransomware", "phishing", "ddos", "exploit", "trojan", "spyware", "penetration",
+        "threat", "payload", "compromise", "backdoor", "cve"
+    ],
+    "Finance": [
+        "revenue", "profit", "loss", "financial", "quarterly", "investment", "money", 
+        "economy", "shares", "market", "expense", "cash", "growth", "margin", "dividend", 
+        "fiscal", "asset", "capital", "budget", "balance sheet", "investor", "stock", 
+        "accounting", "ebitda", "valuation", "tax", "banking"
+    ],
+    "Healthcare": [
+        "patient", "hospital", "doctor", "medical", "disease", "clinical", "treatment", 
+        "health", "drug", "symptoms", "therapy", "illness", "acute", "fever", "respiratory", 
+        "diagnosis", "vaccine", "clinic", "surgery", "physician", "infection", "medicine",
+        "pathology", "cardiac", "oncology"
+    ],
+    "Education": [
+        "school", "university", "student", "teacher", "exam", "class", "study", "education", 
+        "lecture", "learn", "course", "homework", "academic", "college", "grade", "degree", 
+        "professor", "curriculum", "classroom", "faculty", "pedagogy"
+    ],
+    "Legal": [
+        "contract", "agreement", "law", "lawsuit", "lawyer", "legal", "court", "regulation", 
+        "compliance", "policy", "terms", "litigation", "liability", "clause", "jurisdiction", 
+        "statutory", "attorney", "statute", "indemnification", "arbitration"
+    ],
+    "Technology": [
+        "software", "hardware", "artificial intelligence", "ai", "computer", "algorithm", 
+        "code", "database", "system", "engineering", "cloud", "network", "developer", 
+        "server", "programming", "frontend", "backend", "machine learning", "api", "framework"
+    ]
+}
 
 def predict_category(text: str) -> str:
     """
-    Sıfır örnekli (zero-shot) sınıflandırma ile metnin kategorisini belirler.
+    Yüksek hızlı, bellek dostu ve deterministik kural tabanlı kategori sınıflandırıcısı.
+    Render 512MB RAM sınırına takılmadan anında sonuç verir.
     """
     if not text or not text.strip():
         return "General"
         
-    # Sınıflandırma için ilk 1000 karakter yeterlidir ve token taşmasını önler
-    truncated_text = text[:1000]
+    lower_text = text.lower()
+    scores = {}
+
+    for category, keywords in CATEGORY_KEYWORDS.items():
+        score = 0
+        for kw in keywords:
+            # Tam kelime eşleşmesi ile skor hesaplama
+            pattern = rf"\b{re.escape(kw)}\b"
+            matches = len(re.findall(pattern, lower_text))
+            score += matches
+        scores[category] = score
+
+    # En yüksek skora sahip kategoriyi bul
+    best_category = max(scores, key=scores.get)
     
-    try:
-        classifier = _get_classifier()
-        result = classifier(truncated_text, candidate_labels=CATEGORIES)
-        return result['labels'][0]
-    except Exception as e:
-        print(f"Kategori tahmin uyarısı: {e}")
-        return "General"
+    if scores[best_category] > 0:
+        return best_category
+        
+    return "Technology"  # Varsayılan fallback
