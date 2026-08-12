@@ -27,19 +27,22 @@ def _summarize_single_chunk(text_chunk: str, max_length: int = 130, min_length: 
     adjusted_max = min(max_length, max(30, int(input_length * 0.75)))
     adjusted_min = min(min_length, max(5, int(adjusted_max * 0.4)))
     
-    with torch.no_grad():
+    with torch.inference_mode():
         summary_ids = model.generate(
             inputs["input_ids"],
             max_length=adjusted_max,
             min_length=adjusted_min,
-            num_beams=2,
+            num_beams=1,
             no_repeat_ngram_size=3,
             early_stopping=True,
             forced_bos_token_id=0,
             do_sample=False
         )
     
-    return tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+    result = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+    del inputs, summary_ids
+    gc.collect()
+    return result
 
 def generate_summary(text: str) -> str:
     """
