@@ -26,7 +26,7 @@ function getApiBaseUrl() {
         return window.location.origin;
     }
     
-    return 'https://document-analysis-ai.onrender.com';
+    return 'https://doc-analysis-ai.onrender.com';
 }
 
 const API_URL = getApiBaseUrl();
