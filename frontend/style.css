@@ -6,7 +6,7 @@
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(8px); }
+    from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
 }
 
@@ -27,36 +27,78 @@ body {
 
 /* Glassmorphism kart stili */
 .glass-card {
-    background: rgba(15, 23, 42, 0.75);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(15, 23, 42, 0.82);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .glass-inner {
-    background: rgba(30, 41, 59, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(30, 41, 59, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 /* Neon parlama efektleri */
 .neon-glow {
-    box-shadow: 0 0 30px -5px rgba(59, 130, 246, 0.2), 0 0 15px -2px rgba(99, 102, 241, 0.15);
+    box-shadow: 0 0 40px -5px rgba(59, 130, 246, 0.25), 0 0 20px -2px rgba(99, 102, 241, 0.2);
 }
 
 .neon-text {
-    background: linear-gradient(135deg, #60a5fa 0%, #a855f7 100%);
+    background: linear-gradient(135deg, #60a5fa 0%, #c084fc 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
 }
 
+/* Dil Etiketleri (Ayrışmış ve belirgin rozetler) */
+.lang-badge-tr {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    color: #fca5a5;
+    font-size: 0.75rem;
+    font-weight: 800;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.375rem;
+    letter-spacing: 0.05em;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.lang-badge-en {
+    background: rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    color: #93c5fd;
+    font-size: 0.75rem;
+    font-weight: 800;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.375rem;
+    letter-spacing: 0.05em;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+/* Örnek Buton Kartları */
+.sample-card-btn {
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(51, 65, 85, 0.8);
+    transition: all 0.2s ease;
+}
+.sample-card-btn:hover {
+    background: rgba(30, 41, 59, 0.9);
+    border-color: rgba(96, 165, 250, 0.6);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
 /* Özel scrollbar */
 textarea::-webkit-scrollbar {
-    width: 6px;
+    width: 8px;
 }
 textarea::-webkit-scrollbar-track {
     background: rgba(15, 23, 42, 0.6);
 }
 textarea::-webkit-scrollbar-thumb {
-    background: rgba(59, 130, 246, 0.4);
+    background: rgba(59, 130, 246, 0.5);
     border-radius: 4px;
 }

@@ -1,0 +1,74 @@
+import os
+import httpx
+from typing import Optional
+from dotenv import load_dotenv
+
+# .env dosyasındaki ortam değişkenlerini yükle
+load_dotenv()
+
+GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+
+def is_llm_available() -> bool:
+    """Groq API anahtarının mevcut ve geçerli olup olmadığını kontrol eder."""
+    api_key = os.getenv("GROQ_API_KEY", "").strip()
+    enabled = os.getenv("LLM_ENABLED", "true").lower() in ("true", "1", "yes")
+    return bool(api_key and api_key != "your_groq_api_key_here" and enabled)
+
+def generate_llm_summary(text: str, language: str = "en", model: Optional[str] = None) -> Optional[str]:
+    """
+    Groq LPU altyapısı (LLaMA-3.3 / LLaMA-3.1) kullanarak metni tamamen baştan,
+    özgün ve akıcı bir şekilde soyutlayarak (abstractive) özetler.
+    
+    API anahtarı yoksa veya hata oluşursa None döner (böylece yerel fallback devreye girer).
+    """
+    if not is_llm_available() or not text or not text.strip():
+        return None
+
+    api_key = os.getenv("GROQ_API_KEY", "").strip()
+    selected_model = model or os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    
+    lang_name = "Türkçe" if language == "tr" else "English"
+    
+    system_prompt = (
+        f"You are an expert, highly precise AI document summarizer. "
+        f"Your task is to write a concise, professional, and completely original abstractive summary in {lang_name}. "
+        f"CRITICAL INSTRUCTIONS:\n"
+        f"1. Do NOT copy sentences verbatim from the input text.\n"
+        f"2. Synthesize the core message, key findings, and critical actions using fresh and fluent wording.\n"
+        f"3. For short/single sentences, condense the primary essence into one clear statement.\n"
+        f"4. For longer documents or incident reports, provide a high-density 1-2 sentence executive overview.\n"
+        f"5. Output ONLY the summary text in {lang_name}, without meta-comments, introductory phrases, or markdown headers."
+    )
+    
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "model": selected_model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Text to summarize:\n\n{text}"}
+        ],
+        "temperature": 0.2,
+        "max_tokens": 300
+    }
+    
+    try:
+        with httpx.Client(timeout=6.0) as client:
+            response = client.post(GROQ_API_URL, headers=headers, json=payload)
+            if response.status_code == 200:
+                data = response.json()
+                summary = data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                if summary:
+                    # Tırnak veya gereksiz çevreleyen karakterleri temizle
+                    return summary.strip('"').strip("'").strip()
+            else:
+                print(f"[Groq LLM Uyarı] HTTP {response.status_code}: {response.text}")
+                return None
+    except Exception as e:
+        print(f"[Groq LLM Bağlantı Hatası] {e}")
+        return None
+
+    return None

@@ -1,7 +1,9 @@
 # pyrefly: ignore [missing-import]
+from typing import Optional
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from app.models.schemas import TextAnalysisRequest, AnalysisResponse
 from app.utils.text_cleaner import clean_text
+from app.utils.language_detector import detect_language, get_language_label
 from app.services.summary_service import generate_summary
 from app.services.keyword_service import extract_keywords
 from app.services.category_service import predict_category
@@ -14,7 +16,7 @@ router = APIRouter()
 def health_check():
     return {"status": "ok", "message": "AI Analysis Service is running!"}
 
-def process_text_pipeline(raw_text: str) -> AnalysisResponse:
+def process_text_pipeline(raw_text: str, req_language: Optional[str] = None) -> AnalysisResponse:
     if not raw_text or not raw_text.strip():
         raise HTTPException(status_code=400, detail="Metin içeriği boş olamaz.")
         
@@ -24,8 +26,11 @@ def process_text_pipeline(raw_text: str) -> AnalysisResponse:
         raise HTTPException(status_code=400, detail="Metin içeriği geçerli karakter barındırmıyor.")
 
     try:
-        summary = generate_summary(cleaned_text)
-        keywords = extract_keywords(cleaned_text)
+        lang_code = req_language if req_language and req_language.strip() else detect_language(cleaned_text)
+        lang_label = get_language_label(lang_code)
+        
+        summary = generate_summary(cleaned_text, language=lang_code)
+        keywords = extract_keywords(cleaned_text, language=lang_code)
         category = predict_category(cleaned_text)
         risk_data = analyze_risk(cleaned_text)
 
@@ -34,14 +39,16 @@ def process_text_pipeline(raw_text: str) -> AnalysisResponse:
             keywords=keywords,
             category=category,
             risk_level=risk_data["risk_level"],
-            risk_score=risk_data["risk_score"]
+            risk_score=risk_data["risk_score"],
+            language=lang_code,
+            language_label=lang_label
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analiz sırasında bir sunucu hatası oluştu: {str(e)}")
 
 @router.post("/analyze-text", response_model=AnalysisResponse)
 def analyze_text(request: TextAnalysisRequest):
-    return process_text_pipeline(request.text)
+    return process_text_pipeline(request.text, req_language=request.language)
 
 @router.post("/analyze-pdf", response_model=AnalysisResponse)
 async def analyze_pdf(file: UploadFile = File(...)):

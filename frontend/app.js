@@ -36,8 +36,8 @@ let activeTab = 'pdf';
 // Sekme Değiştirme
 tabPdf.addEventListener('click', () => {
     activeTab = 'pdf';
-    tabPdf.className = 'flex-1 py-2.5 px-3 rounded-lg font-semibold text-blue-400 bg-slate-800/80 shadow transition-all flex items-center justify-center gap-2';
-    tabText.className = 'flex-1 py-2.5 px-3 rounded-lg font-semibold text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center gap-2';
+    tabPdf.className = 'flex-1 py-3 px-4 rounded-xl font-bold text-blue-400 bg-slate-800/90 shadow transition-all flex items-center justify-center gap-2.5';
+    tabText.className = 'flex-1 py-3 px-4 rounded-xl font-bold text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center gap-2.5';
     
     pdfSection.classList.remove('hidden');
     textSection.classList.add('hidden');
@@ -47,8 +47,8 @@ tabPdf.addEventListener('click', () => {
 
 tabText.addEventListener('click', () => {
     activeTab = 'text';
-    tabText.className = 'flex-1 py-2.5 px-3 rounded-lg font-semibold text-blue-400 bg-slate-800/80 shadow transition-all flex items-center justify-center gap-2';
-    tabPdf.className = 'flex-1 py-2.5 px-3 rounded-lg font-semibold text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center gap-2';
+    tabText.className = 'flex-1 py-3 px-4 rounded-xl font-bold text-blue-400 bg-slate-800/90 shadow transition-all flex items-center justify-center gap-2.5';
+    tabPdf.className = 'flex-1 py-3 px-4 rounded-xl font-bold text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center gap-2.5';
     
     textSection.classList.remove('hidden');
     pdfSection.classList.add('hidden');
@@ -69,10 +69,21 @@ clearTextBtn.addEventListener('click', () => {
     hideToast();
 });
 
-// Hızlı Örnekler
+// Çok Dilli Hızlı Örnekler
 const SAMPLES = {
-    cyber: "CONFIDENTIAL INCIDENT REPORT: Critical zero-day vulnerability detected in primary database firewall. An unauthorized data breach was initiated by an external malicious group, leading to potential confidential leak of client records. Emergency patch deployment is urgently required across all servers.",
-    finance: "Quarterly Financial Overview: The company achieved a record 24% growth in operating revenue driven by strong enterprise software adoption. Operating expenses decreased by 8%, resulting in improved net profit margins and sustainable free cash flow expansion.",
+    // Türkçe Örnekler
+    tr_cyber: "GİZLİ OLAY BİLDİRİMİ: Şirket ana veri tabanı sunucusunda kritik bir sıfır gün güvenlik açığı tespit edildi. Yetkisiz bir saldırgan grup tarafından başlatılan fidye yazılımı saldırısı sonucunda gizli müşteri kayıtlarında veri sızıntısı meydana geldi. Tüm sunucularda acil güvenlik yaması uygulanması gerekmektedir.",
+    tr_finance: "Üçüncü Çeyrek Finansal Raporu: Şirketimiz bulut ve yapay zekâ yazılım ürünlerine olan yüksek talep sayesinde faaliyet gelirlerinde %28 oranında rekor büyüme kaydetti. İşletme giderleri %6 oranında azalırken net kâr marjı güçlendi ve serbest nakit akışı genişledi.",
+    tr_short: "Bugün üniversitede yapay zekâ ve derin öğrenme modelleri üzerine kapsamlı bir ders işlendi.",
+    
+    // İngilizce Örnekler
+    en_cyber: "CONFIDENTIAL INCIDENT REPORT: Critical zero-day vulnerability detected in primary database firewall. An unauthorized data breach was initiated by an external malicious group, leading to potential confidential leak of client records. Emergency patch deployment is urgently required across all servers.",
+    en_finance: "Quarterly Financial Overview: The company achieved a record 24% growth in operating revenue driven by strong enterprise software adoption. Operating expenses decreased by 8%, resulting in improved net profit margins and sustainable free cash flow expansion.",
+    en_short: "FastAPI is a modern, high-performance web framework for building APIs with Python.",
+    
+    // Eski düğmelerle geriye dönük uyumluluk
+    cyber: "CONFIDENTIAL INCIDENT REPORT: Critical zero-day vulnerability detected in primary database firewall. An unauthorized data breach was initiated by an external malicious group, leading to potential confidential leak of client records.",
+    finance: "Quarterly Financial Overview: The company achieved a record 24% growth in operating revenue driven by strong enterprise software adoption.",
     short: "I went to school today."
 };
 
@@ -122,7 +133,6 @@ async function parseApiResponse(response) {
         return data;
     }
     
-    // HTML veya Text döndüyse (Render 502/503 veya sunucu uyanma aşaması)
     const rawText = await response.text();
     if (response.status === 502 || response.status === 503 || response.status === 504) {
         throw new Error("Sunucu şu anda uyanıyor (Render Cold Start). Lütfen 15-20 saniye sonra tekrar deneyin.");
@@ -195,7 +205,7 @@ analyzeTextBtn.addEventListener('click', async () => {
 
 // Toast / Bildirim
 function showToast(message, type = "info") {
-    toastContainer.className = "mb-4 p-3.5 rounded-xl text-xs sm:text-sm flex items-start gap-2.5 transition-all animate-fade-in";
+    toastContainer.className = "mb-5 p-4 rounded-2xl text-sm sm:text-base flex items-start gap-3 transition-all animate-fade-in";
     
     let icon = "ℹ️";
     if (type === "error") {
@@ -209,9 +219,9 @@ function showToast(message, type = "info") {
     }
     
     toastContainer.innerHTML = `
-        <span class="text-base leading-none">${icon}</span>
-        <div class="flex-1">${message}</div>
-        <button onclick="hideToast()" class="opacity-60 hover:opacity-100 ml-1 text-sm">&times;</button>
+        <span class="text-lg leading-none">${icon}</span>
+        <div class="flex-1 font-medium">${message}</div>
+        <button onclick="hideToast()" class="opacity-60 hover:opacity-100 ml-1 text-base font-bold">&times;</button>
     `;
     toastContainer.classList.remove('hidden');
 }
@@ -261,10 +271,10 @@ function copySummary() {
             if (btn) {
                 const oldHtml = btn.innerHTML;
                 btn.innerHTML = '✓ Kopyalandı';
-                btn.classList.add('text-emerald-400');
+                btn.classList.add('text-emerald-400', 'border-emerald-500/50');
                 setTimeout(() => {
                     btn.innerHTML = oldHtml;
-                    btn.classList.remove('text-emerald-400');
+                    btn.classList.remove('text-emerald-400', 'border-emerald-500/50');
                 }, 2000);
             }
         });
@@ -275,54 +285,75 @@ window.copySummary = copySummary;
 // Risk Rozeti
 function getRiskBadge(level, score) {
     if (level === 'High') {
-        return `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 font-bold text-xs sm:text-sm">🚨 Yüksek Risk (Skor: ${score})</span>`;
+        return `<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-400 font-extrabold text-xs sm:text-sm">🚨 Yüksek Risk (Skor: ${score})</span>`;
     } else if (level === 'Medium') {
-        return `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold text-xs sm:text-sm">⚠️ Orta Risk (Skor: ${score})</span>`;
+        return `<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-400 font-extrabold text-xs sm:text-sm">⚠️ Orta Risk (Skor: ${score})</span>`;
     }
-    return `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold text-xs sm:text-sm">🛡️ Düşük Risk (Skor: ${score})</span>`;
+    return `<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 font-extrabold text-xs sm:text-sm">🛡️ Düşük Risk (Skor: ${score})</span>`;
 }
 
-// Sonuç Gösterimi
+// Sonuç Gösterimi (Genişletilmiş ve Yüksek Kontrastlı)
 function displayResults(data) {
     loader.classList.add('hidden');
     
     const riskBadge = getRiskBadge(data.risk_level, data.risk_score);
+    const isTurkish = (data.language === 'tr');
+    const langBadgeClass = isTurkish ? 'lang-badge-tr' : 'lang-badge-en';
+    const langFlag = isTurkish ? '🇹🇷' : '🇬🇧';
+    const langName = data.language_label || (isTurkish ? 'Türkçe' : 'English');
     
     resultsDiv.innerHTML = `
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div class="p-3.5 sm:p-4 rounded-xl glass-inner">
-                <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Belge Kategorisi</span>
-                <p class="text-base sm:text-lg font-bold text-slate-200 mt-1 flex items-center gap-2">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+            <!-- 1. Belge Dili -->
+            <div class="p-4 sm:p-5 rounded-2xl glass-inner flex flex-col justify-between">
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Belge Dili</span>
+                <div class="flex items-center gap-2 mt-1">
+                    <span class="${langBadgeClass} text-xs sm:text-sm px-2.5 py-1 font-extrabold">${langFlag} ${data.language ? data.language.toUpperCase() : 'TR'}</span>
+                    <span class="text-base sm:text-lg font-bold text-slate-100">${langName}</span>
+                </div>
+            </div>
+
+            <!-- 2. Belge Kategorisi -->
+            <div class="p-4 sm:p-5 rounded-2xl glass-inner flex flex-col justify-between">
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Belge Kategorisi</span>
+                <p class="text-base sm:text-lg font-extrabold text-slate-100 mt-1 flex items-center gap-2">
                     📁 ${data.category}
                 </p>
             </div>
-            <div class="p-3.5 sm:p-4 rounded-xl glass-inner">
-                <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">Risk Değerlendirmesi</span>
-                <div>${riskBadge}</div>
+
+            <!-- 3. Risk Değerlendirmesi -->
+            <div class="p-4 sm:p-5 rounded-2xl glass-inner flex flex-col justify-between">
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Güvenlik Riski</span>
+                <div class="mt-1">${riskBadge}</div>
             </div>
         </div>
 
-        <div class="p-3.5 sm:p-4 rounded-xl glass-inner">
-            <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-2">Anahtar İfadeler</span>
-            <div class="flex flex-wrap gap-1.5 sm:gap-2">
+        <!-- Anahtar İfadeler -->
+        <div class="p-4 sm:p-5 rounded-2xl glass-inner">
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-3">Anahtar İfadeler (Keywords)</span>
+            <div class="flex flex-wrap gap-2">
                 ${data.keywords && data.keywords.length > 0 
-                    ? data.keywords.map(kw => `<span class="px-2.5 py-1 bg-slate-900/90 border border-slate-700/60 text-blue-400 rounded-lg text-xs font-medium"># ${kw}</span>`).join('') 
-                    : '<span class="text-slate-500 text-xs">Anahtar kelime bulunamadı.</span>'}
+                    ? data.keywords.map(kw => `<span class="px-3 py-1.5 bg-slate-900/90 border border-slate-700/80 text-blue-300 rounded-xl text-xs sm:text-sm font-semibold shadow-sm"># ${kw}</span>`).join('') 
+                    : '<span class="text-slate-500 text-sm">Anahtar kelime bulunamadı.</span>'}
             </div>
         </div>
 
-        <div class="p-3.5 sm:p-4 rounded-xl glass-inner relative">
-            <div class="flex justify-between items-center mb-2">
-                <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Yapay Zekâ Özeti</span>
-                <button id="copy-btn" onclick="copySummary()" class="text-xs text-slate-400 hover:text-white transition flex items-center gap-1 px-2 py-0.5 rounded bg-slate-900 border border-slate-800">
+        <!-- Yapay Zekâ Özeti -->
+        <div class="p-5 sm:p-6 rounded-2xl glass-inner relative border border-blue-500/20 shadow-lg">
+            <div class="flex justify-between items-center mb-3">
+                <span class="text-xs sm:text-sm font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+                    ✨ Yapay Zekâ Özeti (Soyutlayıcı / Abstractive)
+                </span>
+                <button id="copy-btn" onclick="copySummary()" class="text-xs sm:text-sm text-slate-300 hover:text-white transition flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 font-semibold">
                     📋 Kopyala
                 </button>
             </div>
-            <p id="summary-content" class="text-slate-300 leading-relaxed text-xs sm:text-sm whitespace-pre-wrap">${data.summary}</p>
+            <p id="summary-content" class="text-slate-100 leading-relaxed text-sm sm:text-base md:text-lg whitespace-pre-wrap font-normal">${data.summary}</p>
         </div>
 
-        <button onclick="resetAnalysis()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 active:scale-[0.99] text-white rounded-xl font-semibold text-xs sm:text-sm transition shadow-lg shadow-blue-600/30">
-            ↺ Yeni Analiz Yap
+        <!-- Yeni Analiz Butonu -->
+        <button onclick="resetAnalysis()" class="w-full py-3.5 sm:py-4 bg-blue-600 hover:bg-blue-500 active:scale-[0.99] text-white rounded-2xl font-bold text-sm sm:text-base transition shadow-xl shadow-blue-600/30">
+            ↺ Yeni Bir Analiz Yap
         </button>
     `;
     resultsDiv.classList.remove('hidden');

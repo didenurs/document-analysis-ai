@@ -12,7 +12,7 @@ def test_health_check():
     assert data["status"] == "ok"
     assert "running" in data["message"].lower()
 
-def test_analyze_text_valid():
+def test_analyze_text_valid_en():
     payload = {
         "text": "Cyber security researchers identified a severe vulnerability in the cloud authentication system leading to an emergency patch release."
     }
@@ -25,8 +25,27 @@ def test_analyze_text_valid():
     assert "category" in data
     assert "risk_level" in data
     assert "risk_score" in data
+    assert "language" in data
+    assert data["language"] == "en"
     assert isinstance(data["keywords"], list)
     assert isinstance(data["risk_score"], int)
+
+def test_analyze_text_valid_tr():
+    payload = {
+        "text": "Şirketimizin üçüncü çeyrek finansal sonuçlarında faaliyet gelirleri ve net kâr marjında önemli büyüme sağlandı."
+    }
+    response = client.post("/analyze-text", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    
+    assert "summary" in data
+    assert "keywords" in data
+    assert "category" in data
+    assert data["category"] == "Finance"
+    assert "risk_level" in data
+    assert "language" in data
+    assert data["language"] == "tr"
+    assert data["language_label"] == "Türkçe"
 
 def test_analyze_text_empty():
     response = client.post("/analyze-text", json={"text": "   "})
@@ -48,3 +67,4 @@ def test_analyze_pdf_valid():
         data = response.json()
         assert "summary" in data
         assert len(data["summary"]) > 0
+        assert "language" in data
