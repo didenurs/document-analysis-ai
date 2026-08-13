@@ -36,8 +36,8 @@ let activeTab = 'pdf';
 // Sekme Değiştirme
 tabPdf.addEventListener('click', () => {
     activeTab = 'pdf';
-    tabPdf.className = 'flex-1 py-3 px-4 rounded-xl font-bold text-blue-400 bg-slate-800/90 shadow transition-all flex items-center justify-center gap-2.5';
-    tabText.className = 'flex-1 py-3 px-4 rounded-xl font-bold text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center gap-2.5';
+    tabPdf.className = 'flex-1 py-2.5 px-3 rounded-lg font-bold text-blue-400 bg-slate-800/90 shadow transition-all flex items-center justify-center gap-2';
+    tabText.className = 'flex-1 py-2.5 px-3 rounded-lg font-bold text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center gap-2';
     
     pdfSection.classList.remove('hidden');
     textSection.classList.add('hidden');
@@ -47,8 +47,8 @@ tabPdf.addEventListener('click', () => {
 
 tabText.addEventListener('click', () => {
     activeTab = 'text';
-    tabText.className = 'flex-1 py-3 px-4 rounded-xl font-bold text-blue-400 bg-slate-800/90 shadow transition-all flex items-center justify-center gap-2.5';
-    tabPdf.className = 'flex-1 py-3 px-4 rounded-xl font-bold text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center gap-2.5';
+    tabText.className = 'flex-1 py-2.5 px-3 rounded-lg font-bold text-blue-400 bg-slate-800/90 shadow transition-all flex items-center justify-center gap-2';
+    tabPdf.className = 'flex-1 py-2.5 px-3 rounded-lg font-bold text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center gap-2';
     
     textSection.classList.remove('hidden');
     pdfSection.classList.add('hidden');
@@ -205,7 +205,7 @@ analyzeTextBtn.addEventListener('click', async () => {
 
 // Toast / Bildirim
 function showToast(message, type = "info") {
-    toastContainer.className = "mb-5 p-4 rounded-2xl text-sm sm:text-base flex items-start gap-3 transition-all animate-fade-in";
+    toastContainer.className = "mb-4 p-3.5 rounded-xl text-xs sm:text-sm flex items-start gap-2.5 transition-all animate-fade-in";
     
     let icon = "ℹ️";
     if (type === "error") {
@@ -219,9 +219,9 @@ function showToast(message, type = "info") {
     }
     
     toastContainer.innerHTML = `
-        <span class="text-lg leading-none">${icon}</span>
+        <span class="text-base leading-none">${icon}</span>
         <div class="flex-1 font-medium">${message}</div>
-        <button onclick="hideToast()" class="opacity-60 hover:opacity-100 ml-1 text-base font-bold">&times;</button>
+        <button onclick="hideToast()" class="opacity-60 hover:opacity-100 ml-1 text-sm font-bold">&times;</button>
     `;
     toastContainer.classList.remove('hidden');
 }
@@ -285,14 +285,14 @@ window.copySummary = copySummary;
 // Risk Rozeti
 function getRiskBadge(level, score) {
     if (level === 'High') {
-        return `<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-400 font-extrabold text-xs sm:text-sm">🚨 Yüksek Risk (Skor: ${score})</span>`;
+        return `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-500/15 border border-rose-500/40 text-rose-400 font-extrabold text-xs">🚨 Yüksek Risk (Skor: ${score})</span>`;
     } else if (level === 'Medium') {
-        return `<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-400 font-extrabold text-xs sm:text-sm">⚠️ Orta Risk (Skor: ${score})</span>`;
+        return `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/40 text-amber-400 font-extrabold text-xs">⚠️ Orta Risk (Skor: ${score})</span>`;
     }
-    return `<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 font-extrabold text-xs sm:text-sm">🛡️ Düşük Risk (Skor: ${score})</span>`;
+    return `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 font-extrabold text-xs">🛡️ Düşük Risk (Skor: ${score})</span>`;
 }
 
-// Sonuç Gösterimi (Genişletilmiş ve Yüksek Kontrastlı)
+// Sonuç Gösterimi
 function displayResults(data) {
     loader.classList.add('hidden');
     
@@ -303,56 +303,56 @@ function displayResults(data) {
     const langName = data.language_label || (isTurkish ? 'Türkçe' : 'English');
     
     resultsDiv.innerHTML = `
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <!-- 1. Belge Dili -->
-            <div class="p-4 sm:p-5 rounded-2xl glass-inner flex flex-col justify-between">
-                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Belge Dili</span>
-                <div class="flex items-center gap-2 mt-1">
-                    <span class="${langBadgeClass} text-xs sm:text-sm px-2.5 py-1 font-extrabold">${langFlag} ${data.language ? data.language.toUpperCase() : 'TR'}</span>
-                    <span class="text-base sm:text-lg font-bold text-slate-100">${langName}</span>
+            <div class="p-3.5 sm:p-4 rounded-xl glass-inner flex flex-col justify-between">
+                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Belge Dili</span>
+                <div class="flex items-center gap-1.5 mt-0.5">
+                    <span class="${langBadgeClass}">${langFlag} ${data.language ? data.language.toUpperCase() : 'TR'}</span>
+                    <span class="text-sm sm:text-base font-bold text-slate-100">${langName}</span>
                 </div>
             </div>
 
             <!-- 2. Belge Kategorisi -->
-            <div class="p-4 sm:p-5 rounded-2xl glass-inner flex flex-col justify-between">
-                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Belge Kategorisi</span>
-                <p class="text-base sm:text-lg font-extrabold text-slate-100 mt-1 flex items-center gap-2">
+            <div class="p-3.5 sm:p-4 rounded-xl glass-inner flex flex-col justify-between">
+                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Belge Kategorisi</span>
+                <p class="text-sm sm:text-base font-bold text-slate-100 mt-0.5 flex items-center gap-1.5">
                     📁 ${data.category}
                 </p>
             </div>
 
             <!-- 3. Risk Değerlendirmesi -->
-            <div class="p-4 sm:p-5 rounded-2xl glass-inner flex flex-col justify-between">
-                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Güvenlik Riski</span>
-                <div class="mt-1">${riskBadge}</div>
+            <div class="p-3.5 sm:p-4 rounded-xl glass-inner flex flex-col justify-between">
+                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Güvenlik Riski</span>
+                <div class="mt-0.5">${riskBadge}</div>
             </div>
         </div>
 
         <!-- Anahtar İfadeler -->
-        <div class="p-4 sm:p-5 rounded-2xl glass-inner">
-            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-3">Anahtar İfadeler (Keywords)</span>
-            <div class="flex flex-wrap gap-2">
+        <div class="p-3.5 sm:p-4 rounded-xl glass-inner">
+            <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Anahtar İfadeler (Keywords)</span>
+            <div class="flex flex-wrap gap-1.5 sm:gap-2">
                 ${data.keywords && data.keywords.length > 0 
-                    ? data.keywords.map(kw => `<span class="px-3 py-1.5 bg-slate-900/90 border border-slate-700/80 text-blue-300 rounded-xl text-xs sm:text-sm font-semibold shadow-sm"># ${kw}</span>`).join('') 
-                    : '<span class="text-slate-500 text-sm">Anahtar kelime bulunamadı.</span>'}
+                    ? data.keywords.map(kw => `<span class="px-2.5 py-1 bg-slate-900/90 border border-slate-700/80 text-blue-300 rounded-lg text-xs font-semibold shadow-sm"># ${kw}</span>`).join('') 
+                    : '<span class="text-slate-500 text-xs">Anahtar kelime bulunamadı.</span>'}
             </div>
         </div>
 
         <!-- Yapay Zekâ Özeti -->
-        <div class="p-5 sm:p-6 rounded-2xl glass-inner relative border border-blue-500/20 shadow-lg">
-            <div class="flex justify-between items-center mb-3">
-                <span class="text-xs sm:text-sm font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+        <div class="p-4 sm:p-5 rounded-xl glass-inner relative border border-blue-500/20 shadow-md">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
                     ✨ Yapay Zekâ Özeti (Soyutlayıcı / Abstractive)
                 </span>
-                <button id="copy-btn" onclick="copySummary()" class="text-xs sm:text-sm text-slate-300 hover:text-white transition flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 font-semibold">
+                <button id="copy-btn" onclick="copySummary()" class="text-xs text-slate-300 hover:text-white transition flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 font-semibold">
                     📋 Kopyala
                 </button>
             </div>
-            <p id="summary-content" class="text-slate-100 leading-relaxed text-sm sm:text-base md:text-lg whitespace-pre-wrap font-normal">${data.summary}</p>
+            <p id="summary-content" class="text-slate-100 leading-relaxed text-xs sm:text-sm md:text-base whitespace-pre-wrap font-normal">${data.summary}</p>
         </div>
 
         <!-- Yeni Analiz Butonu -->
-        <button onclick="resetAnalysis()" class="w-full py-3.5 sm:py-4 bg-blue-600 hover:bg-blue-500 active:scale-[0.99] text-white rounded-2xl font-bold text-sm sm:text-base transition shadow-xl shadow-blue-600/30">
+        <button onclick="resetAnalysis()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 active:scale-[0.99] text-white rounded-xl font-bold text-xs sm:text-sm transition shadow-lg shadow-blue-600/30">
             ↺ Yeni Bir Analiz Yap
         </button>
     `;
