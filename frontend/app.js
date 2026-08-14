@@ -21,17 +21,12 @@ const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp', '.tiff', '.bmp'];
 
 // Otomatik API URL Tespiti (Lokal geliştirme veya canlı Render ortamı)
 function getApiBaseUrl() {
-    const hostname = window.location.hostname;
-    const protocol = window.location.protocol;
-    
-    if (protocol === 'file:') {
+    if (window.location.protocol === 'file:') {
         return 'http://127.0.0.1:8000';
     }
-    if (window.location.origin && window.location.origin !== 'null') {
-        return window.location.origin;
-    }
-    return 'https://doc-analysis-ai.onrender.com';
+    return '';
 }
+
 
 const API_URL = getApiBaseUrl();
 console.log(`[API Bağlantısı] Hedef Adres: ${API_URL}`);

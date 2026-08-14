@@ -1,11 +1,8 @@
 import re
-import gc
 from typing import Optional, List
 from collections import Counter
-from keybert import KeyBERT
+from sklearn.feature_extraction.text import TfidfVectorizer
 from app.utils.language_detector import detect_language
-
-_kw_model = None
 
 MULTILINGUAL_STOPWORDS_LIST = [
     # English
@@ -13,57 +10,47 @@ MULTILINGUAL_STOPWORDS_LIST = [
     "are", "was", "were", "as", "by", "an", "be", "at", "from", "or", "which", "an",
     "have", "has", "had", "will", "would", "can", "could", "should", "their", "our",
     "about", "into", "more", "also", "some", "such", "than", "them", "very", "just",
-    "these", "those", "been", "being",
+    "these", "those", "been", "being", "hour", "hours", "standard", "time",
     # Turkish
     "bir", "ve", "bu", "ile", "için", "da", "de", "ise", "olan", "olarak", "gibi",
     "kadar", "daha", "çok", "en", "ancak", "veya", "tarafından", "şeklinde", "sonra",
     "önce", "üzere", "göre", "tüm", "her", "bazı", "diğer", "bunu", "bunun", "buna",
     "var", "yok", "kendi", "hem", "ya", "ne", "hangi", "nasıl", "neden", "çünkü",
-    "şu", "öyle", "böyle", "şöyle", "artık", "zaten", "bile", "dahi", "yalnız", "ancak"
+    "şu", "öyle", "böyle", "şöyle", "artık", "zaten", "bile", "dahi", "yalnız", "ancak",
+    "saat", "sularında", "son", "derece", "yeni", "büyük", "resmi"
 ]
-
-def _get_kw_model():
-    global _kw_model
-    if _kw_model is None:
-        try:
-            import torch
-            torch.set_grad_enabled(False)
-            torch.set_num_threads(1)
-            print("KeyBERT modeli yükleniyor... (all-MiniLM-L6-v2)")
-            _kw_model = KeyBERT(model="all-MiniLM-L6-v2")
-            gc.collect()
-        except Exception as e:
-            print(f"KeyBERT yükleme uyarısı (Fallback kullanılacak): {e}")
-            _kw_model = None
-    return _kw_model
-
 
 def extract_keywords(text: str, top_n: int = 5, language: Optional[str] = None) -> List[str]:
     """
-    Metinden çok dilli (Türkçe & İngilizce) en önemli semantik anahtar ifadeleri çıkarır.
+    Metinden çok dilli (Türkçe & İngilizce) en önemli semantik anahtar ifadeleri
+    yüksek hızda ve sıfır bellek yükü ile çıkarır.
     """
     if not text or not text.strip():
         return []
         
     lang = language or detect_language(text)
-    stop_words_arg = MULTILINGUAL_STOPWORDS_LIST if lang == "tr" else "english"
+    stops = MULTILINGUAL_STOPWORDS_LIST if lang == "tr" else "english"
     
     try:
-        kw_model = _get_kw_model()
-        if kw_model is not None:
-            keywords = kw_model.extract_keywords(
-                text, 
-                keyphrase_ngram_range=(1, 2), 
-                stop_words=stop_words_arg, 
-                top_n=top_n
-            )
-            extracted = [kw[0] for kw in keywords if len(kw[0].strip()) > 2]
-            if extracted:
-                return extracted
-    except Exception as e:
-        print(f"KeyBERT çıkarım uyarısı: {e}")
+        # N-Gram TF-IDF Tabanlı Hızlı Anahtar Kelime Çıkarımı
+        vec = TfidfVectorizer(
+            token_pattern=r'(?u)\b[a-zA-ZçğıöşüÇĞİÖŞÜ]{3,}\b',
+            ngram_range=(1, 2),
+            stop_words=stops,
+            max_features=40
+        )
+        tfidf = vec.fit_transform([text])
+        feature_names = vec.get_feature_names_out()
+        scores = tfidf.toarray()[0]
+        scored_keywords = sorted(zip(feature_names, scores), key=lambda x: x[1], reverse=True)
         
-    # Gelişmiş TF Tabanlı Çok Dilli Fallback
+        results = [kw for kw, s in scored_keywords if len(kw.strip()) > 3][:top_n]
+        if results:
+            return results
+    except Exception:
+        pass
+        
+    # Güvenli Kelime Frekansı Tabanlı Fallback
     words = re.findall(r'\b[a-zA-ZçğıöşüÇĞİÖŞÜ]{3,}\b', text.lower())
     stop_set = set(MULTILINGUAL_STOPWORDS_LIST)
     filtered = [w for w in words if w not in stop_set and len(w) > 3]
