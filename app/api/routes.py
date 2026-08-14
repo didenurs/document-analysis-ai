@@ -54,16 +54,22 @@ def process_text_pipeline(
         raise HTTPException(status_code=400, detail="Metin içeriği geçerli karakter barındırmıyor.")
 
     try:
+        # Faz 3: KVKK & Kişisel Veri Maskeleme (Privacy by Design: Önce maskeleme yapılır)
+        masked_txt, entity_dicts, kvkk_dict = mask_pii_text(cleaned_text, mask_mode="starred")
+        
         lang_code = req_language if req_language and req_language.strip() else detect_language(cleaned_text)
         lang_label = get_language_label(lang_code)
         
-        summary = generate_summary(cleaned_text, language=lang_code)
-        keywords = extract_keywords(cleaned_text, language=lang_code)
-        category = predict_category(cleaned_text)
-        risk_data = analyze_risk(cleaned_text)
+        # LLM ve Özet motoruna doğrudan maskelenmiş güvenli metin gönderilir (Sıfır Veri Sızıntısı)
+        raw_summary = generate_summary(masked_txt, language=lang_code)
         
-        # Faz 3: KVKK & Kişisel Veri Maskeleme
-        masked_txt, entity_dicts, kvkk_dict = mask_pii_text(cleaned_text, mask_mode="starred")
+        # Çıktı özetini de her ihtimale karşı PII filtresinden geçir (Çift Katmanlı Koruma)
+        summary, _, _ = mask_pii_text(raw_summary, mask_mode="starred")
+        
+        keywords = extract_keywords(masked_txt, language=lang_code)
+        category = predict_category(masked_txt)
+        risk_data = analyze_risk(cleaned_text)
+
         
         pii_entities = [
             PIIEntity(

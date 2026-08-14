@@ -37,8 +37,10 @@ def generate_llm_summary(text: str, language: str = "en", model: Optional[str] =
         f"2. Synthesize the core message, key findings, literary themes, or critical takeaways using fresh, fluent, and coherent wording.\n"
         f"3. For longer documents or articles, provide a comprehensive 3-5 sentence structured executive summary.\n"
         f"4. ALWAYS ensure the summary is completely finished and ends strictly with a full stop or appropriate punctuation. Never stop mid-sentence.\n"
-        f"5. Output ONLY the summary text in {lang_name}, without meta-comments, introductory phrases, or markdown headers."
+        f"5. PRIVACY & PII RULE: If the input text contains masked data or privacy placeholders (e.g. 100*****46, 0532 *** ** 67, [TCKN], a***@domain.com), NEVER attempt to reveal or invent private personal data. Keep them masked or describe them abstractly.\n"
+        f"6. Output ONLY the summary text in {lang_name}, without meta-comments, introductory phrases, or markdown headers."
     )
+
     
     headers = {
         "Authorization": f"Bearer {api_key}",
