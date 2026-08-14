@@ -4,17 +4,30 @@ import re
 CATEGORY_KEYWORDS = {
     "Cyber Security": [
         # İngilizce
-        "vulnerability", "breach", "attack", "malware", "hack", "zero-day", "firewall", 
-        "leak", "cyber", "confidential", "incident", "unauthorized", "credential", 
-        "ransomware", "phishing", "ddos", "exploit", "trojan", "spyware", "penetration",
-        "threat", "payload", "compromise", "backdoor", "cve", "intrusion", "security",
+        "vulnerability", "breach", "malware", "hack", "zero-day", "firewall", 
+        "data leak", "cyber", "ransomware", "phishing", "ddos", "exploit", "trojan", 
+        "spyware", "penetration test", "cyber threat", "payload", "backdoor", "cve", 
+        "intrusion detection", "cyber security", "cyber attack", "data breach", "credential theft",
         # Türkçe
-        "zafiyet", "güvenlik açığı", "güvenlik acigi", "ihlal", "saldırı", "saldiri", 
-        "zararlı yazılım", "zararli yazilim", "kötü amaçlı", "kotu amacli", "hack", 
-        "sızma", "sizma", "güvenlik duvarı", "guvenlik duvari", "sızıntı", "sizinti", 
-        "siber", "gizli", "olay", "yetkisiz", "kimlik bilgisi", "fidye", "fidye yazılımı", 
-        "fidye yazilimi", "oltalama", "istismar", "truva atı", "truva ati", "casus yazılım", 
-        "casus yazilimi", "tehdit", "arka kapı", "arka kapi", "güvenlik", "guvenlik"
+        "zafiyet", "güvenlik açığı", "güvenlik acigi", "zararlı yazılım", "zararli yazilim", 
+        "kötü amaçlı yazılım", "kotu amacli yazilim", "hack", "sızma testi", "sizma testi", 
+        "güvenlik duvarı", "guvenlik duvari", "veri sızıntısı", "veri sizintisi", 
+        "siber", "siber saldırı", "siber saldiri", "siber tehdit", "siber olay", "güvenlik olayı",
+        "yetkisiz erişim", "fidye yazılımı", "fidye yazilimi", "oltalama saldırısı", 
+        "truva atı", "truva ati", "casus yazılım", "casus yazilimi", "arka kapı", "arka kapi", 
+        "bilgi güvenliği", "ağ güvenliği"
+    ],
+    "Literature & Arts": [
+        # İngilizce
+        "literature", "novel", "story", "fiction", "poem", "poetry", "author", "narrator", 
+        "plot", "literary", "protagonist", "character", "art", "theme", "narrative", "drama", 
+        "essay", "prose", "book", "criticism", "folklore", "metaphor", "aesthetic",
+        # Türkçe
+        "öykü", "oyku", "öykücülük", "oykuculuk", "roman", "hikâye", "hikaye", "edebiyat", 
+        "yazar", "şair", "sair", "şiir", "siir", "anlatıcı", "anlatici", "olay örgüsü", 
+        "olay orgusu", "sanat", "tiyatro", "karakter", "kahraman", "kurgu", "metin", 
+        "masal", "mesnevî", "mesnevi", "kıssa", "kissa", "menkıbe", "menkibe", "makale", 
+        "eser", "tasavvuf", "tema", "yapıt", "yapit", "üslup", "uslup", "anlatı", "anlati", "kitap"
     ],
     "Finance": [
         # İngilizce
@@ -98,7 +111,6 @@ def predict_category(text: str) -> str:
         score = 0
         for kw in keywords:
             normalized_kw = _normalize_text(kw)
-            # Kelime veya tam kelime grubu eşleşmesi
             pattern = rf"\b{re.escape(normalized_kw)}\b"
             matches = len(re.findall(pattern, lower_text))
             score += matches
@@ -110,4 +122,4 @@ def predict_category(text: str) -> str:
     if scores[best_category] > 0:
         return best_category
         
-    return "Technology"  # Varsayılan fallback
+    return "General"

@@ -34,9 +34,9 @@ def generate_llm_summary(text: str, language: str = "en", model: Optional[str] =
         f"Your task is to write a concise, professional, and completely original abstractive summary in {lang_name}. "
         f"CRITICAL INSTRUCTIONS:\n"
         f"1. Do NOT copy sentences verbatim from the input text.\n"
-        f"2. Synthesize the core message, key findings, and critical actions using fresh and fluent wording.\n"
-        f"3. For short/single sentences, condense the primary essence into one clear statement.\n"
-        f"4. For longer documents or incident reports, provide a high-density 1-2 sentence executive overview.\n"
+        f"2. Synthesize the core message, key findings, literary themes, or critical takeaways using fresh, fluent, and coherent wording.\n"
+        f"3. For longer documents or articles, provide a comprehensive 3-5 sentence structured executive summary.\n"
+        f"4. ALWAYS ensure the summary is completely finished and ends strictly with a full stop or appropriate punctuation. Never stop mid-sentence.\n"
         f"5. Output ONLY the summary text in {lang_name}, without meta-comments, introductory phrases, or markdown headers."
     )
     
@@ -52,12 +52,13 @@ def generate_llm_summary(text: str, language: str = "en", model: Optional[str] =
             {"role": "user", "content": f"Text to summarize:\n\n{text}"}
         ],
         "temperature": 0.2,
-        "max_tokens": 300
+        "max_tokens": 700
     }
     
     try:
-        with httpx.Client(timeout=6.0) as client:
+        with httpx.Client(timeout=8.0) as client:
             response = client.post(GROQ_API_URL, headers=headers, json=payload)
+
             if response.status_code == 200:
                 data = response.json()
                 summary = data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()

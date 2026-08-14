@@ -1,34 +1,37 @@
 import re
 
-# Türkçe ve İngilizce kritiklik seviyelerine göre ağırlıklandırılmış anahtar kelimeler
+# Türkçe ve İngilizce kritiklik seviyelerine göre ağırlıklandırılmış güvenlik ve kriz anahtar kelimeleri
 HIGH_RISK_KEYWORDS = [
     # İngilizce
-    "breach", "zero-day", "exploit", "ransomware", "malware", 
-    "leak", "compromise", "backdoor", "data loss", "exfiltration", "hijack",
+    "data breach", "zero-day", "exploit", "ransomware", "malware", 
+    "data leak", "system compromise", "backdoor", "data loss", "exfiltration", "hijack",
     # Türkçe
-    "sızıntı", "sizinti", "sıfır gün", "sifir gun", "fidye yazılımı", "fidye yazilimi", 
+    "veri sızıntısı", "veri sizintisi", "sıfır gün", "sifir gun", "fidye yazılımı", "fidye yazilimi", 
     "zararlı yazılım", "zararli yazilim", "kötü amaçlı yazılım", "kotu amacli yazilim", 
-    "sızma", "sizma", "arka kapı", "arka kapi", "veri kaybı", "veri kaybi", 
-    "veri sızıntısı", "veri sizintisi", "bilgi sızıntısı", "bilgi sizintisi", 
-    "veri hırsızlığı", "veri hirsizligi", "ele geçirme", "ele gecirme"
+    "sızma testi", "sizma testi", "arka kapı", "arka kapi", "veri kaybı", "veri kaybi", 
+    "bilgi sızıntısı", "bilgi sizintisi", "veri hırsızlığı", "veri hirsizligi", 
+    "sistem ele geçirme", "sistem ele gecirme", "yetkisiz erişim", "yetkisiz erisim"
 ]
 
 MEDIUM_RISK_KEYWORDS = [
     # İngilizce
-    "attack", "vulnerability", "threat", "failure", "critical", 
-    "emergency", "urgent", "unauthorized", "phishing", "incident", "crash", "outage",
+    "cyber attack", "vulnerability", "security threat", "system failure", "critical outage", 
+    "emergency state", "urgent incident", "phishing attack", "server crash", "infrastructure failure",
     # Türkçe
-    "saldırı", "saldiri", "zafiyet", "güvenlik açığı", "güvenlik acigi", 
-    "tehdit", "arıza", "ariza", "kritik", "acil durum", "acil", "yetkisiz", 
-    "oltalama", "olay", "çökme", "cokme", "kesinti", "ihlal", "tehlike", "aksama"
+    "siber saldırı", "siber saldiri", "güvenlik zafiyeti", "guvenlik zafiyeti", "güvenlik açığı", "guvenlik acigi", 
+    "siber tehdit", "siber olay", "güvenlik olayı", "olay müdahalesi", "olay mudahalesi",
+    "kritik arıza", "kritik ariza", "acil müdahale", "acil mudahale", "acil durum", 
+    "oltalama saldırısı", "oltalama saldirisi", "sistem çökmesi", "sistem cokmesi", "güvenlik ihlali"
 ]
 
 LOW_RISK_KEYWORDS = [
     # İngilizce
-    "warning", "suspicious", "patch", "audit", "alert", "anomaly", "update", "maintenance",
+    "security warning", "suspicious activity", "security patch", "audit finding", 
+    "security alert", "system anomaly", "urgent update", "maintenance window",
     # Türkçe
-    "uyarı", "uyari", "şüpheli", "supheli", "yama", "denetim", 
-    "alarm", "anomali", "güncelleme", "guncelleme", "bakım", "bakim", "tedbir"
+    "güvenlik uyarısı", "guvenlik uyarisi", "şüpheli aktivite", "supheli aktivite", 
+    "güvenlik yaması", "guvenlik yamasi", "denetim bulgusu", "güvenlik alarmı", 
+    "guvenlik alarmi", "sistem anomalisi", "acil güncelleme", "acil guncelleme", "güvenlik tedbiri"
 ]
 
 def _normalize_text(text: str) -> str:
@@ -36,7 +39,7 @@ def _normalize_text(text: str) -> str:
 
 def analyze_risk(text: str) -> dict:
     """
-    Metindeki risk göstergelerini çok dilli (Türkçe & İngilizce) tam kelime eşleşmesi
+    Metindeki risk göstergelerini çok dilli (Türkçe & İngilizce) tam kelime grubu eşleşmesi
     ve ağırlıklı skorlama ile analiz eder.
     """
     if not text or not text.strip():
