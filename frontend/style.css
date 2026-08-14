@@ -15,8 +15,17 @@
     50% { opacity: 0.8; }
 }
 
+@keyframes bounceSlow {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+}
+
 .animate-fade-in {
-    animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-bounce-slow {
+    animation: bounceSlow 1.4s infinite ease-in-out;
 }
 
 body {
@@ -27,7 +36,7 @@ body {
 
 /* Glassmorphism kart stili */
 .glass-card {
-    background: rgba(15, 23, 42, 0.82);
+    background: rgba(15, 23, 42, 0.85);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -49,7 +58,7 @@ body {
     -webkit-text-fill-color: transparent;
 }
 
-/* Dil Etiketleri (Ayrışmış ve belirgin rozetler) */
+/* Dil Etiketleri */
 .lang-badge-tr {
     background: rgba(239, 68, 68, 0.15);
     border: 1px solid rgba(239, 68, 68, 0.4);
@@ -89,6 +98,40 @@ body {
     border-color: rgba(96, 165, 250, 0.6);
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+/* Chat Kutusu & Mesaj Baloncukları */
+.chat-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(59, 130, 246, 0.5) rgba(15, 23, 42, 0.6);
+}
+
+.chat-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+.chat-scroll::-webkit-scrollbar-track {
+    background: rgba(15, 23, 42, 0.6);
+    border-radius: 8px;
+}
+.chat-scroll::-webkit-scrollbar-thumb {
+    background: rgba(59, 130, 246, 0.4);
+    border-radius: 8px;
+}
+.chat-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(59, 130, 246, 0.7);
+}
+
+.chat-bubble-user {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    color: #ffffff;
+    border-bottom-right-radius: 4px;
+}
+
+.chat-bubble-ai {
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    color: #f1f5f9;
+    border-bottom-left-radius: 4px;
 }
 
 /* Özel scrollbar */

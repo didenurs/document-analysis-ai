@@ -32,11 +32,14 @@ console.log(`[API Bağlantısı] Hedef Adres: ${API_URL}`);
 
 let activeTab = 'pdf';
 
-// Aktif Analiz ve Çeviri Durumu
+// Aktif Analiz, Çeviri ve RAG Sohbet Durumu
 let activeAnalysisData = null;
+let activeDocumentText = "";
 let currentSummaryOriginal = "";
 let currentSummaryTranslated = null;
 let isShowingTranslation = false;
+let chatHistory = [];
+let isChatSending = false;
 
 // Sekme Değiştirme
 tabPdf.addEventListener('click', () => {
@@ -76,20 +79,13 @@ clearTextBtn.addEventListener('click', () => {
 
 // Çok Dilli Hızlı Örnekler
 const SAMPLES = {
-    // Türkçe Örnekler
     tr_cyber: "GİZLİ OLAY RAPORU: ACİL SALDIRI MÜDAHALESİ GEREKLİDİR Saat 02:00 sularında dahili izleme sistemlerimiz, merkezi kurumsal ağımızın birincil veritabanı güvenlik duvarında kritik bir arıza tespit etti. Son derece koordineli bir siber saldırı, bulut altyapımızda yeni keşfedilen bir sıfır gün güvenlik açığını başarıyla istismar ederek benzeri görülmemiş büyüklükte bir veri ihlaline yol açtı. Kötü niyetli saldırganlar ikincil kimlik doğrulama protokollerini ve şifreleme katmanlarını atlatmayı başararak müşterilerimizin son derece gizli finansal kayıtları için ciddi bir tehdit oluşturdu. Güvenliği ihlal edilen sunucular derhal izole edilip çevrimdışı bırakılmazsa büyük bir veri sızıntısının gerçekleşme olasılığı yüksek olduğundan, küresel olay müdahale ekibimiz tüm departmanlarda resmi olarak acil durum ilan etti. Tüm sistem yöneticilerinin, geliştiricilerin ve personelin kimlik bilgilerini sıfırlaması ve tespit edilen güvenlik açığını bir saat içinde yamaması kesinlikle ve acilen gerekmektedir. Bu ihlal, operasyonel bütünlüğümüz ve pazar itibarımız için kritik bir tehdit oluşturmaktadır. Saldırının tam kapsamını anlamak ve gelecekte başka bir saldırıyı veya yıkıcı sistem çökmesini önlemek amacıyla acil bir güvenlik denetimi ve adli bilişim analizi yürütülmektedir.",
     tr_finance: "Üçüncü Çeyrek Finansal Raporu: Şirketimiz bulut ve yapay zekâ yazılım ürünlerine olan yüksek talep sayesinde faaliyet gelirlerinde %28 oranında rekor büyüme kaydetti. İşletme giderleri %6 oranında azalırken net kâr marjı güçlendi ve serbest nakit akışı genişledi.",
     tr_short: "Bugün üniversitede yapay zekâ ve derin öğrenme modelleri üzerine kapsamlı bir ders işlendi.",
     
-    // İngilizce Örnekler
     en_cyber: "CONFIDENTIAL INCIDENT REPORT: IMMEDIATE ATTACK RESPONSE REQUIRED At 02:00 AM standard time, our internal monitoring systems detected a critical failure in the primary database firewall of our central corporate network. A highly coordinated cyber attack successfully exploited a newly discovered zero-day vulnerability in our cloud infrastructure, leading to a massive and unprecedented data breach. The malicious actors managed to bypass the secondary authentication protocols and encryption layers, posing a severe threat to our clients' highly confidential financial records. Our global incident response team has officially declared a state of emergency across all departments, as there is a high probability of an imminent data leak if the compromised servers are not isolated and taken offline immediately. It is absolutely urgent that all system administrators, developers, and staff reset their credentials and patch the identified vulnerability within the next hour. This breach represents a critical threat to our operational integrity and overall market reputation. An urgent security audit and forensic analysis are currently underway to understand the full scope of the intrusion and to prevent any further attack or catastrophic system failure in the near future.",
     en_finance: "Quarterly Financial Overview: The company achieved a record 24% growth in operating revenue driven by strong enterprise software adoption. Operating expenses decreased by 8%, resulting in improved net profit margins and sustainable free cash flow expansion.",
-    en_short: "FastAPI is a modern, high-performance web framework for building APIs with Python.",
-    
-    // Eski düğmelerle geriye dönük uyumluluk
-    cyber: "CONFIDENTIAL INCIDENT REPORT: IMMEDIATE ATTACK RESPONSE REQUIRED At 02:00 AM standard time, our internal monitoring systems detected a critical failure in the primary database firewall of our central corporate network.",
-    finance: "Quarterly Financial Overview: The company achieved a record 24% growth in operating revenue driven by strong enterprise software adoption.",
-    short: "I went to school today."
+    en_short: "FastAPI is a modern, high-performance web framework for building APIs with Python."
 };
 
 function loadSample(type) {
@@ -278,9 +274,12 @@ function resetAnalysis() {
     charCount.textContent = '0 karakter';
     fileInput.value = '';
     activeAnalysisData = null;
+    activeDocumentText = "";
     currentSummaryOriginal = "";
     currentSummaryTranslated = null;
     isShowingTranslation = false;
+    chatHistory = [];
+    isChatSending = false;
     hideToast();
     setLoading(false);
 }
@@ -409,14 +408,163 @@ function getMethodBadge(method, pageCount) {
     return `<span class="inline-flex items-center px-2 py-0.5 rounded-md border text-[11px] font-semibold ${badgeClass}">${methodText}${pages}</span>`;
 }
 
+// RAG Doküman Sohbet Fonksiyonları
+async function sendChatMessage(customQuestion = null) {
+    if (isChatSending) return;
+    
+    const inputEl = document.getElementById('chat-input');
+    const messagesContainer = document.getElementById('chat-messages');
+    if (!messagesContainer) return;
+
+    const question = (customQuestion || inputEl?.value || '').trim();
+    if (!question) return;
+
+    if (!activeDocumentText) {
+        showToast("Sohbet edebilmek için önce bir doküman analiz edilmelidir.", "warning");
+        return;
+    }
+
+    if (inputEl) inputEl.value = '';
+    isChatSending = true;
+
+    // 1. Kullanıcı Mesajını Ekrana Ekle
+    const userMsgHtml = `
+        <div class="flex justify-end animate-fade-in">
+            <div class="max-w-[85%] sm:max-w-[75%] p-3 rounded-2xl chat-bubble-user text-xs sm:text-sm font-medium shadow-md">
+                ${escapeHtml(question)}
+            </div>
+        </div>
+    `;
+    messagesContainer.insertAdjacentHTML('beforeend', userMsgHtml);
+
+    // 2. Yükleniyor / Yazıyor Baloncuğu
+    const typingId = `typing-${Date.now()}`;
+    const typingHtml = `
+        <div id="${typingId}" class="flex items-start gap-2 animate-fade-in">
+            <div class="w-7 h-7 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 text-xs shrink-0 mt-0.5">
+                🤖
+            </div>
+            <div class="max-w-[85%] sm:max-w-[75%] p-3 rounded-2xl chat-bubble-ai text-xs sm:text-sm text-slate-300 shadow-md flex items-center gap-2">
+                <span class="inline-block w-2 h-2 rounded-full bg-blue-400 animate-ping"></span>
+                <span>Doküman taranıyor ve yanıt üretiliyor...</span>
+            </div>
+        </div>
+    `;
+    messagesContainer.insertAdjacentHTML('beforeend', typingHtml);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+    try {
+        const response = await fetch(`${API_URL}/chat-document`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                document_text: activeDocumentText,
+                question: question,
+                history: chatHistory,
+                language: activeAnalysisData?.language || 'tr'
+            })
+        });
+
+        const data = await parseApiResponse(response);
+        
+        // Typing animasyonunu kaldır
+        const typingEl = document.getElementById(typingId);
+        if (typingEl) typingEl.remove();
+
+        // 3. AI Cevabını Ekrana Ekle
+        const confidenceBadge = data.confidence 
+            ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400 font-semibold">🎯 %${Math.round(data.confidence * 100)} Doğruluk</span>` 
+            : '';
+
+        let sourcesHtml = '';
+        if (data.sources && data.sources.length > 0) {
+            const sourceItems = data.sources.map((s, idx) => `
+                <div class="p-2 rounded-lg bg-slate-950/80 border border-slate-800 text-[11px] text-slate-400 leading-relaxed font-mono">
+                    <span class="text-blue-400 font-bold">#${idx+1}:</span> "${escapeHtml(s.slice(0, 180))}${s.length > 180 ? '...' : ''}"
+                </div>
+            `).join('');
+
+            sourcesHtml = `
+                <details class="mt-2.5 pt-2 border-t border-slate-800/80 text-[11px]">
+                    <summary class="cursor-pointer text-slate-400 hover:text-blue-400 font-semibold select-none flex items-center gap-1">
+                        <span>📄 İlgili Kaynak Pasajları Göster (${data.sources.length})</span>
+                    </summary>
+                    <div class="mt-2 space-y-1.5 animate-fade-in">
+                        ${sourceItems}
+                    </div>
+                </details>
+            `;
+        }
+
+        const aiMsgHtml = `
+            <div class="flex items-start gap-2 animate-fade-in">
+                <div class="w-7 h-7 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 text-xs shrink-0 mt-0.5">
+                    🤖
+                </div>
+                <div class="max-w-[85%] sm:max-w-[80%] p-3.5 rounded-2xl chat-bubble-ai text-xs sm:text-sm text-slate-100 shadow-md">
+                    <div class="flex items-center justify-between gap-2 mb-1.5">
+                        <span class="font-bold text-blue-400 text-[11px]">Doc Assistant AI</span>
+                        ${confidenceBadge}
+                    </div>
+                    <div class="leading-relaxed whitespace-pre-wrap">${escapeHtml(data.answer)}</div>
+                    ${sourcesHtml}
+                </div>
+            </div>
+        `;
+        messagesContainer.insertAdjacentHTML('beforeend', aiMsgHtml);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+        // Geçmişe ekle
+        chatHistory.push({ role: "user", content: question });
+        chatHistory.push({ role: "assistant", content: data.answer });
+
+    } catch (err) {
+        const typingEl = document.getElementById(typingId);
+        if (typingEl) typingEl.remove();
+
+        const errorMsgHtml = `
+            <div class="flex items-start gap-2 animate-fade-in">
+                <div class="w-7 h-7 rounded-xl bg-rose-600/20 border border-rose-500/30 flex items-center justify-center text-rose-400 text-xs shrink-0 mt-0.5">
+                    ⚠️
+                </div>
+                <div class="p-3 rounded-2xl bg-rose-950/40 border border-rose-500/30 text-rose-300 text-xs sm:text-sm">
+                    Soru yanıtlanırken bir hata oluştu: ${escapeHtml(err.message)}
+                </div>
+            </div>
+        `;
+        messagesContainer.insertAdjacentHTML('beforeend', errorMsgHtml);
+    } finally {
+        isChatSending = false;
+    }
+}
+window.sendChatMessage = sendChatMessage;
+
+function askSuggestedQuestion(q) {
+    sendChatMessage(q);
+}
+window.askSuggestedQuestion = askSuggestedQuestion;
+
+// HTML Kaçış Yardımcısı
+function escapeHtml(text) {
+    if (!text) return '';
+    return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 // Sonuç Gösterimi
 function displayResults(data) {
     loader.classList.add('hidden');
     
     activeAnalysisData = data;
+    activeDocumentText = data.cleaned_text || textInput.value || data.summary || "";
     currentSummaryOriginal = data.summary;
     currentSummaryTranslated = null;
     isShowingTranslation = false;
+    chatHistory = [];
 
     const riskBadge = getRiskBadge(data.risk_level, data.risk_score);
     const methodBadge = getMethodBadge(data.extraction_method, data.page_count);
@@ -426,6 +574,29 @@ function displayResults(data) {
     const langName = data.language_label || (isTurkish ? 'Türkçe' : 'English');
     const translateBtnText = isTurkish ? "🌐 English'e Çevir" : "🌐 Türkçe'ye Çevir";
     
+    // Hızlı Soru Önerileri (Dile göre dinamik)
+    const suggestedChips = isTurkish ? `
+        <button type="button" onclick="askSuggestedQuestion('Bu belgedeki en kritik bulgu veya olay nedir?')" class="px-2.5 py-1 rounded-lg bg-slate-900/90 border border-slate-700/80 hover:border-blue-500/60 hover:text-blue-300 text-[11px] font-medium text-slate-300 transition text-left">
+            ⚡ En kritik bulgu nedir?
+        </button>
+        <button type="button" onclick="askSuggestedQuestion('Alınması gereken acil aksiyonlar ve önlemler nelerdir?')" class="px-2.5 py-1 rounded-lg bg-slate-900/90 border border-slate-700/80 hover:border-blue-500/60 hover:text-blue-300 text-[11px] font-medium text-slate-300 transition text-left">
+            🛡️ Acil aksiyonlar nelerdir?
+        </button>
+        <button type="button" onclick="askSuggestedQuestion('Dokümanda belirtilen önemli tarihler ve sayılar neler?')" class="px-2.5 py-1 rounded-lg bg-slate-900/90 border border-slate-700/80 hover:border-blue-500/60 hover:text-blue-300 text-[11px] font-medium text-slate-300 transition text-left">
+            📅 Tarihler ve sayılar neler?
+        </button>
+    ` : `
+        <button type="button" onclick="askSuggestedQuestion('What is the most critical incident or finding in this document?')" class="px-2.5 py-1 rounded-lg bg-slate-900/90 border border-slate-700/80 hover:border-blue-500/60 hover:text-blue-300 text-[11px] font-medium text-slate-300 transition text-left">
+            ⚡ What are the key findings?
+        </button>
+        <button type="button" onclick="askSuggestedQuestion('What urgent actions or mitigation steps are required?')" class="px-2.5 py-1 rounded-lg bg-slate-900/90 border border-slate-700/80 hover:border-blue-500/60 hover:text-blue-300 text-[11px] font-medium text-slate-300 transition text-left">
+            🛡️ What actions are needed?
+        </button>
+        <button type="button" onclick="askSuggestedQuestion('What are the key dates, figures, and metrics mentioned?')" class="px-2.5 py-1 rounded-lg bg-slate-900/90 border border-slate-700/80 hover:border-blue-500/60 hover:text-blue-300 text-[11px] font-medium text-slate-300 transition text-left">
+            📅 What are key figures & dates?
+        </button>
+    `;
+
     resultsDiv.innerHTML = `
         <!-- Üst Metot ve Durum Barı -->
         <div class="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-950/70 border border-slate-800/80 text-xs">
@@ -492,9 +663,63 @@ function displayResults(data) {
             <p id="summary-content" class="text-slate-100 leading-relaxed text-xs sm:text-sm md:text-base whitespace-pre-wrap font-normal">${data.summary}</p>
         </div>
 
+        <!-- FAZ 2: Doküman ile Sohbet (RAG Q&A) Paneli -->
+        <div class="p-4 sm:p-5 rounded-2xl glass-inner border border-indigo-500/30 shadow-xl space-y-3.5">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span class="text-base sm:text-lg">💬</span>
+                    <div>
+                        <h3 class="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
+                            Dokümanla Sohbet Et (RAG Q&A)
+                            <span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-semibold border border-indigo-500/30">Groq LLaMA-3.3</span>
+                        </h3>
+                        <p class="text-[11px] text-slate-400">Bu dokümanın içeriğine dair her şeyi sorun; yapay zekâ kaynak referanslarıyla yanıtlasın.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hızlı Soru Çipleri -->
+            <div class="flex flex-wrap gap-1.5 pt-1">
+                ${suggestedChips}
+            </div>
+
+            <!-- Mesaj Listesi -->
+            <div id="chat-messages" class="max-h-[280px] overflow-y-auto chat-scroll p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-3">
+                <div class="flex items-start gap-2">
+                    <div class="w-7 h-7 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 text-xs shrink-0 mt-0.5">
+                        🤖
+                    </div>
+                    <div class="max-w-[85%] p-3 rounded-2xl chat-bubble-ai text-xs sm:text-sm text-slate-200">
+                        ${isTurkish 
+                            ? 'Merhaba! Bu dokümanı analiz ettim. İçerikte geçen herhangi bir detay, tarih, kişi veya aksiyon hakkında soru sorabilirsiniz.' 
+                            : 'Hello! I have analyzed this document. You can ask any specific questions about dates, facts, figures, or action items.'}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Soru Giriş Alanı -->
+            <form id="chat-form" onsubmit="event.preventDefault(); sendChatMessage();" class="flex gap-2">
+                <input 
+                    type="text" 
+                    id="chat-input" 
+                    placeholder="${isTurkish ? 'Doküman hakkında bir soru sorun (örn. Olay saat kaçta gerçekleşti?)...' : 'Ask a question about this document...'}" 
+                    class="flex-1 px-3.5 py-2.5 bg-slate-950/90 border border-slate-800 rounded-xl text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition"
+                    autocomplete="off"
+                >
+                <button 
+                    type="submit" 
+                    id="chat-send-btn" 
+                    class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white rounded-xl text-xs sm:text-sm font-bold transition shadow-lg shadow-indigo-600/30 flex items-center gap-1.5 shrink-0"
+                >
+                    <span>Gönder</span>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                </button>
+            </form>
+        </div>
+
         <!-- Yeni Analiz Butonu -->
         <button onclick="resetAnalysis()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 active:scale-[0.99] text-white rounded-xl font-bold text-xs sm:text-sm transition shadow-lg shadow-blue-600/30">
-            ↺ Yeni Bir Analiz Yap
+            ↺ Yeni Bir Doküman Analiz Et
         </button>
     `;
     resultsDiv.classList.remove('hidden');

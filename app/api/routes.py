@@ -4,7 +4,9 @@ from app.models.schemas import (
     TextAnalysisRequest, 
     AnalysisResponse, 
     TranslationRequest, 
-    TranslationResponse
+    TranslationResponse,
+    ChatDocumentRequest,
+    ChatDocumentResponse
 )
 from app.utils.text_cleaner import clean_text
 from app.utils.language_detector import detect_language, get_language_label
@@ -15,6 +17,7 @@ from app.services.risk_service import analyze_risk
 from app.services.pdf_service import extract_text_from_pdf
 from app.services.ocr_service import extract_text_from_image_bytes
 from app.services.llm_service import translate_text
+from app.services.rag_service import generate_rag_answer
 
 router = APIRouter()
 
@@ -63,7 +66,8 @@ def process_text_pipeline(
             language=lang_code,
             language_label=lang_label,
             extraction_method=extraction_method,
-            page_count=page_count
+            page_count=page_count,
+            cleaned_text=cleaned_text
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analiz sırasında bir sunucu hatası oluştu: {str(e)}")
@@ -153,3 +157,33 @@ def translate_endpoint(request: TranslationRequest):
         target_language=target_lang,
         target_language_label=target_label
     )
+
+@router.post("/chat-document", response_model=ChatDocumentResponse)
+def chat_document_endpoint(request: ChatDocumentRequest):
+    if not request.document_text or not request.document_text.strip():
+        raise HTTPException(status_code=400, detail="Doküman metni boş olamaz.")
+        
+    if not request.question or not request.question.strip():
+        raise HTTPException(status_code=400, detail="Soru metni boş olamaz.")
+
+    # Sohbet geçmişini dict listesine dönüştür
+    history_dicts = []
+    if request.history:
+        for msg in request.history:
+            history_dicts.append({"role": msg.role, "content": msg.content})
+
+    try:
+        rag_result = generate_rag_answer(
+            document_text=request.document_text,
+            question=request.question,
+            history=history_dicts,
+            language=request.language
+        )
+        return ChatDocumentResponse(
+            answer=rag_result["answer"],
+            sources=rag_result["sources"],
+            confidence=rag_result["confidence"],
+            language=rag_result["language"]
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Soru yanıtlanırken bir hata oluştu: {str(e)}")
