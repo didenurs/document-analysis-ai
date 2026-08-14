@@ -134,3 +134,19 @@ def test_pdf_service_valid_file():
         extracted = extract_text_from_pdf(pdf_bytes)
         assert isinstance(extracted, str)
         assert len(extracted) > 0
+
+def test_translate_text_mock():
+    from app.services.llm_service import translate_text
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "choices": [
+            {"message": {"content": "Bu bir çeviri örneğidir."}}
+        ]
+    }
+    
+    with patch.dict(os.environ, {"GROQ_API_KEY": "gsk_test123", "LLM_ENABLED": "true"}):
+        with patch("httpx.Client.post", return_value=mock_response):
+            translated = translate_text("This is a translation sample.", target_language="tr")
+            assert translated == "Bu bir çeviri örneğidir."
+

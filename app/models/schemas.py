@@ -15,3 +15,13 @@ class AnalysisResponse(BaseModel):
     language_label: Optional[str] = "English"
     extraction_method: Optional[str] = "text"
     page_count: Optional[int] = None
+
+class TranslationRequest(BaseModel):
+    text: str
+    target_language: str = "tr"  # "tr" veya "en"
+
+class TranslationResponse(BaseModel):
+    original_text: str
+    translated_text: str
+    target_language: str
+    target_language_label: str

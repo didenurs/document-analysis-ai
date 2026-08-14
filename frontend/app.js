@@ -27,11 +27,16 @@ function getApiBaseUrl() {
     return '';
 }
 
-
 const API_URL = getApiBaseUrl();
 console.log(`[API Bağlantısı] Hedef Adres: ${API_URL}`);
 
 let activeTab = 'pdf';
+
+// Aktif Analiz ve Çeviri Durumu
+let activeAnalysisData = null;
+let currentSummaryOriginal = "";
+let currentSummaryTranslated = null;
+let isShowingTranslation = false;
 
 // Sekme Değiştirme
 tabPdf.addEventListener('click', () => {
@@ -272,6 +277,10 @@ function resetAnalysis() {
     textInput.value = '';
     charCount.textContent = '0 karakter';
     fileInput.value = '';
+    activeAnalysisData = null;
+    currentSummaryOriginal = "";
+    currentSummaryTranslated = null;
+    isShowingTranslation = false;
     hideToast();
     setLoading(false);
 }
@@ -296,6 +305,79 @@ function copySummary() {
     }
 }
 window.copySummary = copySummary;
+
+// Özet Çevirisi (TR <-> EN Çift Yönlü Çeviri)
+async function toggleSummaryTranslation() {
+    const summaryEl = document.getElementById('summary-content');
+    const translateBtn = document.getElementById('translate-btn');
+    const langBadge = document.getElementById('summary-lang-indicator');
+    if (!summaryEl || !translateBtn || !activeAnalysisData) return;
+
+    const originalLang = activeAnalysisData.language || 'en';
+    const targetLang = (originalLang === 'tr') ? 'en' : 'tr';
+    const targetLabel = (targetLang === 'tr') ? 'Türkçe' : 'English';
+    const originalLabel = (originalLang === 'tr') ? 'Türkçe' : 'English';
+
+    // 1. Durum: Zaten çeviri gösteriliyorsa orijinale geri dön
+    if (isShowingTranslation) {
+        summaryEl.textContent = currentSummaryOriginal;
+        isShowingTranslation = false;
+        translateBtn.innerHTML = `🌐 ${targetLabel}'ye Çevir`;
+        translateBtn.classList.remove('bg-indigo-600/30', 'border-indigo-500/60', 'text-indigo-300');
+        translateBtn.classList.add('bg-slate-900', 'border-slate-700', 'text-slate-300');
+        if (langBadge) {
+            langBadge.textContent = originalLabel;
+            langBadge.className = originalLang === 'tr' ? 'lang-badge-tr' : 'lang-badge-en';
+        }
+        return;
+    }
+
+    // 2. Durum: Daha önce çevrildiyse önbellekten (cache) anında getir
+    if (currentSummaryTranslated) {
+        summaryEl.textContent = currentSummaryTranslated;
+        isShowingTranslation = true;
+        translateBtn.innerHTML = `🔄 Orijinale Dön (${originalLabel})`;
+        translateBtn.classList.add('bg-indigo-600/30', 'border-indigo-500/60', 'text-indigo-300');
+        if (langBadge) {
+            langBadge.textContent = `${targetLabel} (Çeviri)`;
+            langBadge.className = targetLang === 'tr' ? 'lang-badge-tr' : 'lang-badge-en';
+        }
+        return;
+    }
+
+    // 3. Durum: İlk kez çeviri yapılıyor -> API'ye sor
+    const oldBtnContent = translateBtn.innerHTML;
+    translateBtn.innerHTML = `⏳ Çevriliyor...`;
+    translateBtn.disabled = true;
+
+    try {
+        const response = await fetch(`${API_URL}/translate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                text: currentSummaryOriginal,
+                target_language: targetLang
+            })
+        });
+
+        const data = await parseApiResponse(response);
+        currentSummaryTranslated = data.translated_text;
+        summaryEl.textContent = currentSummaryTranslated;
+        isShowingTranslation = true;
+        translateBtn.innerHTML = `🔄 Orijinale Dön (${originalLabel})`;
+        translateBtn.classList.add('bg-indigo-600/30', 'border-indigo-500/60', 'text-indigo-300');
+        if (langBadge) {
+            langBadge.textContent = `${targetLabel} (Çeviri)`;
+            langBadge.className = targetLang === 'tr' ? 'lang-badge-tr' : 'lang-badge-en';
+        }
+    } catch (err) {
+        showToast(`Çeviri işlemi başarısız oldu: ${err.message}`, "warning");
+        translateBtn.innerHTML = oldBtnContent;
+    } finally {
+        translateBtn.disabled = false;
+    }
+}
+window.toggleSummaryTranslation = toggleSummaryTranslation;
 
 // Risk Rozeti
 function getRiskBadge(level, score) {
@@ -331,12 +413,18 @@ function getMethodBadge(method, pageCount) {
 function displayResults(data) {
     loader.classList.add('hidden');
     
+    activeAnalysisData = data;
+    currentSummaryOriginal = data.summary;
+    currentSummaryTranslated = null;
+    isShowingTranslation = false;
+
     const riskBadge = getRiskBadge(data.risk_level, data.risk_score);
     const methodBadge = getMethodBadge(data.extraction_method, data.page_count);
     const isTurkish = (data.language === 'tr');
     const langBadgeClass = isTurkish ? 'lang-badge-tr' : 'lang-badge-en';
     const langFlag = isTurkish ? '🇹🇷' : '🇬🇧';
     const langName = data.language_label || (isTurkish ? 'Türkçe' : 'English');
+    const translateBtnText = isTurkish ? "🌐 English'e Çevir" : "🌐 Türkçe'ye Çevir";
     
     resultsDiv.innerHTML = `
         <!-- Üst Metot ve Durum Barı -->
@@ -380,15 +468,26 @@ function displayResults(data) {
             </div>
         </div>
 
-        <!-- Yapay Zekâ Özeti -->
+        <!-- Yapay Zekâ Özeti ve Çeviri Alanı -->
         <div class="p-4 sm:p-5 rounded-xl glass-inner relative border border-blue-500/20 shadow-md">
-            <div class="flex justify-between items-center mb-2">
-                <span class="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
-                    ✨ Yapay Zekâ Özeti (Soyutlayıcı / Abstractive)
-                </span>
-                <button id="copy-btn" onclick="copySummary()" class="text-xs text-slate-300 hover:text-white transition flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 font-semibold">
-                    📋 Kopyala
-                </button>
+            <div class="flex flex-wrap justify-between items-center gap-2 mb-2.5">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+                        ✨ Yapay Zekâ Özeti
+                    </span>
+                    <span id="summary-lang-indicator" class="${langBadgeClass} text-[10px] py-0.5 px-1.5">${langName}</span>
+                </div>
+                
+                <div class="flex items-center gap-1.5">
+                    <!-- Çift Yönlü Çeviri Butonu -->
+                    <button id="translate-btn" onclick="toggleSummaryTranslation()" class="text-xs text-slate-300 hover:text-white transition flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 font-semibold hover:border-blue-500">
+                        ${translateBtnText}
+                    </button>
+                    <!-- Kopyalama Butonu -->
+                    <button id="copy-btn" onclick="copySummary()" class="text-xs text-slate-300 hover:text-white transition flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 font-semibold">
+                        📋 Kopyala
+                    </button>
+                </div>
             </div>
             <p id="summary-content" class="text-slate-100 leading-relaxed text-xs sm:text-sm md:text-base whitespace-pre-wrap font-normal">${data.summary}</p>
         </div>

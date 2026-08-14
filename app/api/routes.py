@@ -1,6 +1,11 @@
 from typing import Optional
 from fastapi import APIRouter, UploadFile, File, HTTPException
-from app.models.schemas import TextAnalysisRequest, AnalysisResponse
+from app.models.schemas import (
+    TextAnalysisRequest, 
+    AnalysisResponse, 
+    TranslationRequest, 
+    TranslationResponse
+)
 from app.utils.text_cleaner import clean_text
 from app.utils.language_detector import detect_language, get_language_label
 from app.services.summary_service import generate_summary
@@ -9,6 +14,7 @@ from app.services.category_service import predict_category
 from app.services.risk_service import analyze_risk
 from app.services.pdf_service import extract_text_from_pdf
 from app.services.ocr_service import extract_text_from_image_bytes
+from app.services.llm_service import translate_text
 
 router = APIRouter()
 
@@ -122,3 +128,28 @@ async def analyze_image(file: UploadFile = File(...)):
         )
         
     return process_text_pipeline(raw_text, extraction_method=method)
+
+@router.post("/translate", response_model=TranslationResponse)
+def translate_endpoint(request: TranslationRequest):
+    if not request.text or not request.text.strip():
+        raise HTTPException(status_code=400, detail="Çevrilecek metin boş olamaz.")
+        
+    target_lang = request.target_language.lower()
+    if target_lang not in ["tr", "en"]:
+        raise HTTPException(status_code=400, detail="Desteklenen hedef diller: 'tr', 'en'")
+        
+    target_label = "Türkçe" if target_lang == "tr" else "English"
+    translated = translate_text(request.text, target_language=target_lang)
+    
+    if not translated:
+        raise HTTPException(
+            status_code=500, 
+            detail="Metin çevrilirken bir hata oluştu. Lütfen geçerli bir LLM API anahtarı sağlandığından emin olun."
+        )
+        
+    return TranslationResponse(
+        original_text=request.text,
+        translated_text=translated,
+        target_language=target_lang,
+        target_language_label=target_label
+    )

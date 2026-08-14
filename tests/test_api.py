@@ -68,3 +68,17 @@ def test_analyze_pdf_valid():
         assert "summary" in data
         assert len(data["summary"]) > 0
         assert "language" in data
+
+def test_translate_endpoint_mock():
+    from unittest.mock import patch
+    with patch("app.api.routes.translate_text", return_value="Bu bir yapay zeka çevirisidir."):
+        response = client.post("/translate", json={"text": "This is an AI translation.", "target_language": "tr"})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["translated_text"] == "Bu bir yapay zeka çevirisidir."
+        assert data["target_language"] == "tr"
+
+def test_translate_endpoint_empty():
+    response = client.post("/translate", json={"text": "   ", "target_language": "tr"})
+    assert response.status_code == 400
+

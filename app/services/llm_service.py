@@ -72,3 +72,54 @@ def generate_llm_summary(text: str, language: str = "en", model: Optional[str] =
         return None
 
     return None
+
+
+def translate_text(text: str, target_language: str = "tr", model: Optional[str] = None) -> Optional[str]:
+    """
+    Groq LLM kullanarak metni akıcı ve profesyonel bir şekilde hedef dile (TR/EN) çevirir.
+    """
+    if not is_llm_available() or not text or not text.strip():
+        return None
+
+    api_key = os.getenv("GROQ_API_KEY", "").strip()
+    selected_model = model or os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    
+    target_lang_name = "Türkçe" if target_language == "tr" else "English"
+    
+    system_prompt = (
+        f"You are a professional AI translator. "
+        f"Translate the following text accurately, fluently, and naturally into {target_lang_name}. "
+        f"Preserve technical terms and formatting. "
+        f"Output ONLY the translated text without any explanations, introductory remarks, or quotes."
+    )
+    
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "model": selected_model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Text to translate:\n\n{text}"}
+        ],
+        "temperature": 0.1,
+        "max_tokens": 500
+    }
+    
+    try:
+        with httpx.Client(timeout=8.0) as client:
+            response = client.post(GROQ_API_URL, headers=headers, json=payload)
+            if response.status_code == 200:
+                data = response.json()
+                translated = data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                if translated:
+                    return translated.strip('"').strip("'").strip()
+            else:
+                print(f"[Groq Translation Uyarı] HTTP {response.status_code}: {response.text}")
+    except Exception as e:
+        print(f"[Groq Translation Hata] {e}")
+        
+    return None
+
