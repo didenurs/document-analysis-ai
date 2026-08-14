@@ -26,13 +26,17 @@ def _get_kw_model():
     global _kw_model
     if _kw_model is None:
         try:
+            import torch
+            torch.set_grad_enabled(False)
+            torch.set_num_threads(1)
             print("KeyBERT modeli yükleniyor... (all-MiniLM-L6-v2)")
             _kw_model = KeyBERT(model="all-MiniLM-L6-v2")
             gc.collect()
         except Exception as e:
-            print(f"KeyBERT yükleme hatası: {e}")
+            print(f"KeyBERT yükleme uyarısı (Fallback kullanılacak): {e}")
             _kw_model = None
     return _kw_model
+
 
 def extract_keywords(text: str, top_n: int = 5, language: Optional[str] = None) -> List[str]:
     """
