@@ -5,6 +5,20 @@ class TextAnalysisRequest(BaseModel):
     text: str
     language: Optional[str] = None
 
+class PIIEntity(BaseModel):
+    type: str
+    text: str
+    label: str
+    masked_value: str
+    start: Optional[int] = None
+    end: Optional[int] = None
+
+class KVKKReport(BaseModel):
+    status: str
+    risk_level: str
+    total_entities: int
+    breakdown: Dict[str, int]
+
 class AnalysisResponse(BaseModel):
     summary: str
     keywords: List[str]
@@ -16,6 +30,9 @@ class AnalysisResponse(BaseModel):
     extraction_method: Optional[str] = "text"
     page_count: Optional[int] = None
     cleaned_text: Optional[str] = None
+    entities: Optional[List[PIIEntity]] = []
+    masked_text: Optional[str] = None
+    kvkk_report: Optional[KVKKReport] = None
 
 class TranslationRequest(BaseModel):
     text: str
@@ -42,3 +59,13 @@ class ChatDocumentResponse(BaseModel):
     sources: List[str]
     confidence: float
     language: str
+
+class MaskRequest(BaseModel):
+    text: str
+    mask_mode: Optional[str] = "starred"  # "starred", "redact", "tag"
+
+class MaskResponse(BaseModel):
+    original_text: str
+    masked_text: str
+    entities: List[PIIEntity]
+    kvkk_report: KVKKReport

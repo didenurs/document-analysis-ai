@@ -32,12 +32,13 @@ console.log(`[API Bağlantısı] Hedef Adres: ${API_URL}`);
 
 let activeTab = 'pdf';
 
-// Aktif Analiz, Çeviri ve RAG Sohbet Durumu
+// Aktif Analiz, Çeviri, KVKK ve RAG Sohbet Durumu
 let activeAnalysisData = null;
 let activeDocumentText = "";
 let currentSummaryOriginal = "";
 let currentSummaryTranslated = null;
 let isShowingTranslation = false;
+let isShowingMasked = true;
 let chatHistory = [];
 let isChatSending = false;
 
@@ -80,10 +81,12 @@ clearTextBtn.addEventListener('click', () => {
 // Çok Dilli Hızlı Örnekler
 const SAMPLES = {
     tr_cyber: "GİZLİ OLAY RAPORU: ACİL SALDIRI MÜDAHALESİ GEREKLİDİR Saat 02:00 sularında dahili izleme sistemlerimiz, merkezi kurumsal ağımızın birincil veritabanı güvenlik duvarında kritik bir arıza tespit etti. Son derece koordineli bir siber saldırı, bulut altyapımızda yeni keşfedilen bir sıfır gün güvenlik açığını başarıyla istismar ederek benzeri görülmemiş büyüklükte bir veri ihlaline yol açtı. Kötü niyetli saldırganlar ikincil kimlik doğrulama protokollerini ve şifreleme katmanlarını atlatmayı başararak müşterilerimizin son derece gizli finansal kayıtları için ciddi bir tehdit oluşturdu. Güvenliği ihlal edilen sunucular derhal izole edilip çevrimdışı bırakılmazsa büyük bir veri sızıntısının gerçekleşme olasılığı yüksek olduğundan, küresel olay müdahale ekibimiz tüm departmanlarda resmi olarak acil durum ilan etti. Tüm sistem yöneticilerinin, geliştiricilerin ve personelin kimlik bilgilerini sıfırlaması ve tespit edilen güvenlik açığını bir saat içinde yamaması kesinlikle ve acilen gerekmektedir. Bu ihlal, operasyonel bütünlüğümüz ve pazar itibarımız için kritik bir tehdit oluşturmaktadır. Saldırının tam kapsamını anlamak ve gelecekte başka bir saldırıyı veya yıkıcı sistem çökmesini önlemek amacıyla acil bir güvenlik denetimi ve adli bilişim analizi yürütülmektedir.",
+    tr_kvkk: "MÜŞTERİ HESAP EKSTRESİ VE GİZLİ BİLDİRİM:\nSayın Ahmet Yılmaz, 10000000146 T.C. Kimlik numaranıza ait TR12 3456 7890 1234 5678 9012 34 IBAN numaralı hesabınızdan 4543-1234-5678-9012 numaralı kredi kartınıza ödeme yapılmıştır. Detaylı bilgi için müşteri temsilciniz ile ahmet.yilmaz@kurumsal.com veya 0532 123 45 67 üzerinden iletişime geçebilirsiniz. Güvenlik bağlantı IP adresi: 192.168.1.105.",
     tr_finance: "Üçüncü Çeyrek Finansal Raporu: Şirketimiz bulut ve yapay zekâ yazılım ürünlerine olan yüksek talep sayesinde faaliyet gelirlerinde %28 oranında rekor büyüme kaydetti. İşletme giderleri %6 oranında azalırken net kâr marjı güçlendi ve serbest nakit akışı genişledi.",
     tr_short: "Bugün üniversitede yapay zekâ ve derin öğrenme modelleri üzerine kapsamlı bir ders işlendi.",
     
     en_cyber: "CONFIDENTIAL INCIDENT REPORT: IMMEDIATE ATTACK RESPONSE REQUIRED At 02:00 AM standard time, our internal monitoring systems detected a critical failure in the primary database firewall of our central corporate network. A highly coordinated cyber attack successfully exploited a newly discovered zero-day vulnerability in our cloud infrastructure, leading to a massive and unprecedented data breach. The malicious actors managed to bypass the secondary authentication protocols and encryption layers, posing a severe threat to our clients' highly confidential financial records. Our global incident response team has officially declared a state of emergency across all departments, as there is a high probability of an imminent data leak if the compromised servers are not isolated and taken offline immediately. It is absolutely urgent that all system administrators, developers, and staff reset their credentials and patch the identified vulnerability within the next hour. This breach represents a critical threat to our operational integrity and overall market reputation. An urgent security audit and forensic analysis are currently underway to understand the full scope of the intrusion and to prevent any further attack or catastrophic system failure in the near future.",
+    en_kvkk: "EMPLOYEE CONFIDENTIAL RECORD:\nEmployee Dr. John Watson with SSN 123-45-6789 and company email john.watson@enterprise.com has been assigned internal server IP 10.0.0.45. Emergency phone contact is +1 (555) 234-5678. Corporate card: 4111-2222-3333-4444.",
     en_finance: "Quarterly Financial Overview: The company achieved a record 24% growth in operating revenue driven by strong enterprise software adoption. Operating expenses decreased by 8%, resulting in improved net profit margins and sustainable free cash flow expansion.",
     en_short: "FastAPI is a modern, high-performance web framework for building APIs with Python."
 };
@@ -163,10 +166,10 @@ async function handleFile(file) {
     setLoading(true);
     if (isImage) {
         if (loaderTitle) loaderTitle.textContent = "Görsel OCR ile Taranıyor";
-        if (loaderSubtext) loaderSubtext.textContent = "AI Vision & OCR motoru ile görseldeki metinler okunuyor ve analiz ediliyor...";
+        if (loaderSubtext) loaderSubtext.textContent = "AI Vision & OCR motoru ile görseldeki metinler okunuyor, KVKK ve risk analizi yapılıyor...";
     } else {
         if (loaderTitle) loaderTitle.textContent = "Yapay Zekâ Analiz Ediyor";
-        if (loaderSubtext) loaderSubtext.textContent = "PDF ayrıştırılıyor, taranmış sayfalar OCR ile taranıyor ve özetleniyor...";
+        if (loaderSubtext) loaderSubtext.textContent = "PDF ayrıştırılıyor, taranmış sayfalar OCR ile taranıyor, KVKK maskelemesi ve özet çıkarılıyor...";
     }
     hideToast();
 
@@ -199,7 +202,7 @@ analyzeTextBtn.addEventListener('click', async () => {
 
     setLoading(true);
     if (loaderTitle) loaderTitle.textContent = "Metin Analiz Ediliyor";
-    if (loaderSubtext) loaderSubtext.textContent = "Groq LLaMA-3.3 ile soyutlayıcı özetleme, sınıflandırma ve risk analizi yapılıyor...";
+    if (loaderSubtext) loaderSubtext.textContent = "Groq LLaMA-3.3, KVKK maskeleme ve çok dilli risk analizi yapılıyor...";
     hideToast();
 
     try {
@@ -278,6 +281,7 @@ function resetAnalysis() {
     currentSummaryOriginal = "";
     currentSummaryTranslated = null;
     isShowingTranslation = false;
+    isShowingMasked = true;
     chatHistory = [];
     isChatSending = false;
     hideToast();
@@ -304,6 +308,50 @@ function copySummary() {
     }
 }
 window.copySummary = copySummary;
+
+// Maskeli / Orijinal Metin Gösterim Toggle'ı
+function toggleMaskedTextView() {
+    const textDisplayEl = document.getElementById('document-text-content');
+    const toggleBtn = document.getElementById('toggle-mask-btn');
+    if (!textDisplayEl || !toggleBtn || !activeAnalysisData) return;
+
+    if (isShowingMasked) {
+        // Orijinal metni göster
+        textDisplayEl.textContent = activeAnalysisData.cleaned_text || activeDocumentText;
+        isShowingMasked = false;
+        toggleBtn.innerHTML = '🔒 Maskeli Görünüme Geç';
+        toggleBtn.classList.remove('bg-amber-500/20', 'border-amber-500/40', 'text-amber-300');
+        toggleBtn.classList.add('bg-slate-900', 'border-slate-700', 'text-slate-300');
+    } else {
+        // Maskeli metni göster
+        textDisplayEl.textContent = activeAnalysisData.masked_text || activeAnalysisData.cleaned_text || activeDocumentText;
+        isShowingMasked = true;
+        toggleBtn.innerHTML = '👁️ Orijinal Metni Gör';
+        toggleBtn.classList.add('bg-amber-500/20', 'border-amber-500/40', 'text-amber-300');
+        toggleBtn.classList.remove('bg-slate-900', 'border-slate-700', 'text-slate-300');
+    }
+}
+window.toggleMaskedTextView = toggleMaskedTextView;
+
+// Maskelenmiş Metni Kopyalama
+function copyMaskedDocument() {
+    const maskedText = activeAnalysisData?.masked_text || document.getElementById('document-text-content')?.innerText || '';
+    if (maskedText) {
+        navigator.clipboard.writeText(maskedText).then(() => {
+            const btn = document.getElementById('copy-masked-btn');
+            if (btn) {
+                const oldHtml = btn.innerHTML;
+                btn.innerHTML = '✓ Kopyalandı';
+                btn.classList.add('text-emerald-400', 'border-emerald-500/50');
+                setTimeout(() => {
+                    btn.innerHTML = oldHtml;
+                    btn.classList.remove('text-emerald-400', 'border-emerald-500/50');
+                }, 2000);
+            }
+        });
+    }
+}
+window.copyMaskedDocument = copyMaskedDocument;
 
 // Özet Çevirisi (TR <-> EN Çift Yönlü Çeviri)
 async function toggleSummaryTranslation() {
@@ -564,6 +612,7 @@ function displayResults(data) {
     currentSummaryOriginal = data.summary;
     currentSummaryTranslated = null;
     isShowingTranslation = false;
+    isShowingMasked = true;
     chatHistory = [];
 
     const riskBadge = getRiskBadge(data.risk_level, data.risk_score);
@@ -574,6 +623,40 @@ function displayResults(data) {
     const langName = data.language_label || (isTurkish ? 'Türkçe' : 'English');
     const translateBtnText = isTurkish ? "🌐 English'e Çevir" : "🌐 Türkçe'ye Çevir";
     
+    // KVKK Raporu Bilgileri
+    const kvkkReport = data.kvkk_report || { status: '🛡️ Güvenli', risk_level: 'Low', total_entities: 0, breakdown: {} };
+    const entities = data.entities || [];
+    
+    let kvkkStatusBadgeClass = 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300';
+    if (kvkkReport.risk_level === 'High') {
+        kvkkStatusBadgeClass = 'bg-rose-500/15 border-rose-500/40 text-rose-300';
+    } else if (kvkkReport.risk_level === 'Medium') {
+        kvkkStatusBadgeClass = 'bg-amber-500/15 border-amber-500/40 text-amber-300';
+    }
+
+    // Varlık Rozetleri
+    let entityBadgesHtml = '';
+    if (entities.length > 0) {
+        const typeLabels = {
+            'TCKN': '🪪 TCKN',
+            'EMAIL': '📧 E-posta',
+            'PHONE': '📞 Telefon',
+            'IBAN': '🏦 IBAN',
+            'CREDIT_CARD': '💳 Kredi Kartı',
+            'IP_ADDRESS': '🌐 IP Adresi',
+            'NAME': '👤 Kişi Adı',
+            'API_KEY': '🔑 API Key'
+        };
+
+        const breakdown = kvkkReport.breakdown || {};
+        entityBadgesHtml = Object.entries(breakdown).map(([type, count]) => {
+            const label = typeLabels[type] || type;
+            return `<span class="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-700 text-slate-300 text-[11px] font-semibold">${label}: <b>${count}</b></span>`;
+        }).join(' ');
+    } else {
+        entityBadgesHtml = '<span class="text-slate-500 text-xs">Kişisel veya hassas veri bulunamadı.</span>';
+    }
+
     // Hızlı Soru Önerileri (Dile göre dinamik)
     const suggestedChips = isTurkish ? `
         <button type="button" onclick="askSuggestedQuestion('Bu belgedeki en kritik bulgu veya olay nedir?')" class="px-2.5 py-1 rounded-lg bg-slate-900/90 border border-slate-700/80 hover:border-blue-500/60 hover:text-blue-300 text-[11px] font-medium text-slate-300 transition text-left">
@@ -626,6 +709,42 @@ function displayResults(data) {
             <div class="p-3.5 sm:p-4 rounded-xl glass-inner flex flex-col justify-between">
                 <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Güvenlik Riski</span>
                 <div class="mt-0.5">${riskBadge}</div>
+            </div>
+        </div>
+
+        <!-- FAZ 3: KVKK / GDPR & Kişisel Veri Maskeleme Paneli -->
+        <div class="p-4 rounded-xl glass-inner border border-emerald-500/30 shadow-md space-y-2.5">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                    <span class="text-base">🛡️</span>
+                    <span class="text-xs font-bold text-white uppercase tracking-wider">KVKK / GDPR & Veri Maskeleme Raporu</span>
+                </div>
+                <span class="px-2.5 py-1 rounded-lg border text-xs font-bold ${kvkkStatusBadgeClass}">
+                    ${kvkkReport.status}
+                </span>
+            </div>
+
+            <!-- Tespit Edilen Varlık Dağılımı -->
+            <div class="flex flex-wrap gap-1.5 pt-1">
+                ${entityBadgesHtml}
+            </div>
+
+            <!-- Maskelenmiş Metin Görüntüleme & Kontroller -->
+            <div class="mt-2 pt-2 border-t border-slate-800/80">
+                <div class="flex items-center justify-between gap-2 mb-1.5">
+                    <span class="text-[11px] font-semibold text-slate-400">Doküman Metni (Hassas Veriler Koruma Altında):</span>
+                    <div class="flex items-center gap-1.5">
+                        <button id="toggle-mask-btn" onclick="toggleMaskedTextView()" class="text-[11px] text-amber-300 bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 transition px-2.5 py-0.5 rounded-md font-semibold">
+                            👁️ Orijinal Metni Gör
+                        </button>
+                        <button id="copy-masked-btn" onclick="copyMaskedDocument()" class="text-[11px] text-slate-300 bg-slate-900 border border-slate-700 hover:text-white transition px-2 py-0.5 rounded-md font-semibold">
+                            📋 Maskeli Metni Kopyala
+                        </button>
+                    </div>
+                </div>
+                <div id="document-text-content" class="p-3 max-h-[140px] overflow-y-auto chat-scroll rounded-lg bg-slate-950/80 border border-slate-800 text-[11px] text-slate-300 leading-relaxed font-mono whitespace-pre-wrap select-all">
+                    ${escapeHtml(data.masked_text || data.cleaned_text || activeDocumentText)}
+                </div>
             </div>
         </div>
 

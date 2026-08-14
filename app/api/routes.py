@@ -6,7 +6,11 @@ from app.models.schemas import (
     TranslationRequest, 
     TranslationResponse,
     ChatDocumentRequest,
-    ChatDocumentResponse
+    ChatDocumentResponse,
+    MaskRequest,
+    MaskResponse,
+    PIIEntity,
+    KVKKReport
 )
 from app.utils.text_cleaner import clean_text
 from app.utils.language_detector import detect_language, get_language_label
@@ -18,6 +22,7 @@ from app.services.pdf_service import extract_text_from_pdf
 from app.services.ocr_service import extract_text_from_image_bytes
 from app.services.llm_service import translate_text
 from app.services.rag_service import generate_rag_answer
+from app.services.ner_service import mask_pii_text
 
 router = APIRouter()
 
@@ -56,6 +61,28 @@ def process_text_pipeline(
         keywords = extract_keywords(cleaned_text, language=lang_code)
         category = predict_category(cleaned_text)
         risk_data = analyze_risk(cleaned_text)
+        
+        # Faz 3: KVKK & Kişisel Veri Maskeleme
+        masked_txt, entity_dicts, kvkk_dict = mask_pii_text(cleaned_text, mask_mode="starred")
+        
+        pii_entities = [
+            PIIEntity(
+                type=e["type"],
+                text=e["text"],
+                label=e["label"],
+                masked_value=e["masked_value"],
+                start=e.get("start"),
+                end=e.get("end")
+            )
+            for e in entity_dicts
+        ]
+        
+        kvkk_rep = KVKKReport(
+            status=kvkk_dict["status"],
+            risk_level=kvkk_dict["risk_level"],
+            total_entities=kvkk_dict["total_entities"],
+            breakdown=kvkk_dict["breakdown"]
+        )
 
         return AnalysisResponse(
             summary=summary,
@@ -67,7 +94,10 @@ def process_text_pipeline(
             language_label=lang_label,
             extraction_method=extraction_method,
             page_count=page_count,
-            cleaned_text=cleaned_text
+            cleaned_text=cleaned_text,
+            entities=pii_entities,
+            masked_text=masked_txt,
+            kvkk_report=kvkk_rep
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analiz sırasında bir sunucu hatası oluştu: {str(e)}")
@@ -166,7 +196,6 @@ def chat_document_endpoint(request: ChatDocumentRequest):
     if not request.question or not request.question.strip():
         raise HTTPException(status_code=400, detail="Soru metni boş olamaz.")
 
-    # Sohbet geçmişini dict listesine dönüştür
     history_dicts = []
     if request.history:
         for msg in request.history:
@@ -187,3 +216,37 @@ def chat_document_endpoint(request: ChatDocumentRequest):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Soru yanıtlanırken bir hata oluştu: {str(e)}")
+
+@router.post("/mask-pii", response_model=MaskResponse)
+def mask_pii_endpoint(request: MaskRequest):
+    if not request.text or not request.text.strip():
+        raise HTTPException(status_code=400, detail="Maskelenecek metin boş olamaz.")
+        
+    mode = request.mask_mode if request.mask_mode in ["starred", "redact", "tag"] else "starred"
+    masked_txt, entity_dicts, kvkk_dict = mask_pii_text(request.text, mask_mode=mode)
+    
+    pii_entities = [
+        PIIEntity(
+            type=e["type"],
+            text=e["text"],
+            label=e["label"],
+            masked_value=e["masked_value"],
+            start=e.get("start"),
+            end=e.get("end")
+        )
+        for e in entity_dicts
+    ]
+    
+    kvkk_rep = KVKKReport(
+        status=kvkk_dict["status"],
+        risk_level=kvkk_dict["risk_level"],
+        total_entities=kvkk_dict["total_entities"],
+        breakdown=kvkk_dict["breakdown"]
+    )
+    
+    return MaskResponse(
+        original_text=request.text,
+        masked_text=masked_txt,
+        entities=pii_entities,
+        kvkk_report=kvkk_rep
+    )
