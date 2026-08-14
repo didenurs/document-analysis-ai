@@ -13,3 +13,5 @@ class AnalysisResponse(BaseModel):
     risk_score: int
     language: Optional[str] = "en"
     language_label: Optional[str] = "English"
+    extraction_method: Optional[str] = "text"
+    page_count: Optional[int] = None

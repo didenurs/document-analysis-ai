@@ -1,4 +1,3 @@
-# pyrefly: ignore [missing-import]
 from typing import Optional
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from app.models.schemas import TextAnalysisRequest, AnalysisResponse
@@ -9,14 +8,29 @@ from app.services.keyword_service import extract_keywords
 from app.services.category_service import predict_category
 from app.services.risk_service import analyze_risk
 from app.services.pdf_service import extract_text_from_pdf
+from app.services.ocr_service import extract_text_from_image_bytes
 
 router = APIRouter()
+
+SUPPORTED_IMAGE_EXTENSIONS = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+    ".tiff": "image/tiff",
+    ".bmp": "image/bmp"
+}
 
 @router.get("/health")
 def health_check():
     return {"status": "ok", "message": "AI Analysis Service is running!"}
 
-def process_text_pipeline(raw_text: str, req_language: Optional[str] = None) -> AnalysisResponse:
+def process_text_pipeline(
+    raw_text: str, 
+    req_language: Optional[str] = None,
+    extraction_method: str = "text",
+    page_count: Optional[int] = None
+) -> AnalysisResponse:
     if not raw_text or not raw_text.strip():
         raise HTTPException(status_code=400, detail="Metin içeriği boş olamaz.")
         
@@ -41,14 +55,16 @@ def process_text_pipeline(raw_text: str, req_language: Optional[str] = None) -> 
             risk_level=risk_data["risk_level"],
             risk_score=risk_data["risk_score"],
             language=lang_code,
-            language_label=lang_label
+            language_label=lang_label,
+            extraction_method=extraction_method,
+            page_count=page_count
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analiz sırasında bir sunucu hatası oluştu: {str(e)}")
 
 @router.post("/analyze-text", response_model=AnalysisResponse)
 def analyze_text(request: TextAnalysisRequest):
-    return process_text_pipeline(request.text, req_language=request.language)
+    return process_text_pipeline(request.text, req_language=request.language, extraction_method="text")
 
 @router.post("/analyze-pdf", response_model=AnalysisResponse)
 async def analyze_pdf(file: UploadFile = File(...)):
@@ -60,7 +76,7 @@ async def analyze_pdf(file: UploadFile = File(...)):
         if len(file_bytes) == 0:
             raise HTTPException(status_code=400, detail="Yüklenen PDF dosyası boş.")
             
-        raw_text = extract_text_from_pdf(file_bytes)
+        raw_text, method, page_count = extract_text_from_pdf(file_bytes, return_metadata=True)
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
@@ -69,7 +85,40 @@ async def analyze_pdf(file: UploadFile = File(...)):
     if not raw_text.strip():
         raise HTTPException(
             status_code=400, 
-            detail="PDF dosyasından okunabilir metin çıkarılamadı. Dosya boş veya taranmış bir resim dokümanı olabilir."
+            detail="PDF dosyasından metin çıkarılamadı. Dosya boş veya okunamaz durumda olabilir."
         )
     
-    return process_text_pipeline(raw_text)
+    return process_text_pipeline(raw_text, extraction_method=method, page_count=page_count)
+
+@router.post("/analyze-image", response_model=AnalysisResponse)
+async def analyze_image(file: UploadFile = File(...)):
+    filename = (file.filename or "").lower()
+    ext = next((e for e in SUPPORTED_IMAGE_EXTENSIONS if filename.endswith(e)), None)
+    
+    if not ext:
+        supported = ", ".join(SUPPORTED_IMAGE_EXTENSIONS.keys())
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Desteklenmeyen görsel formatı. Lütfen şu formatlardan birini yükleyin: {supported}"
+        )
+        
+    mime_type = SUPPORTED_IMAGE_EXTENSIONS[ext]
+    
+    try:
+        file_bytes = await file.read()
+        if len(file_bytes) == 0:
+            raise HTTPException(status_code=400, detail="Yüklenen görsel dosyası boş.")
+            
+        raw_text, method = extract_text_from_image_bytes(file_bytes, mime_type=mime_type)
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Görsel işlenirken hata oluştu: {str(e)}")
+        
+    if not raw_text.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Görsel üzerinden okunabilir metin çıkarılamadı."
+        )
+        
+    return process_text_pipeline(raw_text, extraction_method=method)

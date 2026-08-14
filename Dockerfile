@@ -13,10 +13,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Set work directory
 WORKDIR /app
 
-# Install minimal system dependencies
+# Install minimal system dependencies & OCR packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    tesseract-ocr \
+    tesseract-ocr-tur \
+    tesseract-ocr-eng \
     && rm -rf /var/lib/apt/lists/*
+
 
 # Install PyTorch CPU-only (saves 2.5GB and prevents CUDA memory overhead)
 RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu

@@ -12,7 +12,12 @@ const charCount = document.getElementById('char-count');
 const toastContainer = document.getElementById('toast-container');
 
 const loader = document.getElementById('loader');
+const loaderTitle = document.getElementById('loader-title');
+const loaderSubtext = document.getElementById('loader-subtext');
 const resultsDiv = document.getElementById('results');
+
+// Desteklenen Görsel Formatları
+const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp', '.tiff', '.bmp'];
 
 // Otomatik API URL Tespiti (Lokal geliştirme veya canlı Render ortamı)
 function getApiBaseUrl() {
@@ -82,7 +87,7 @@ const SAMPLES = {
     en_short: "FastAPI is a modern, high-performance web framework for building APIs with Python.",
     
     // Eski düğmelerle geriye dönük uyumluluk
-    cyber: "CONFIDENTIAL INCIDENT REPORT: IMMEDIATE ATTACK RESPONSE REQUIRED At 02:00 AM standard time, our internal monitoring systems detected a critical failure in the primary database firewall of our central corporate network. A highly coordinated cyber attack successfully exploited a newly discovered zero-day vulnerability in our cloud infrastructure, leading to a massive and unprecedented data breach. The malicious actors managed to bypass the secondary authentication protocols and encryption layers, posing a severe threat to our clients' highly confidential financial records. Our global incident response team has officially declared a state of emergency across all departments, as there is a high probability of an imminent data leak if the compromised servers are not isolated and taken offline immediately. It is absolutely urgent that all system administrators, developers, and staff reset their credentials and patch the identified vulnerability within the next hour. This breach represents a critical threat to our operational integrity and overall market reputation. An urgent security audit and forensic analysis are currently underway to understand the full scope of the intrusion and to prevent any further attack or catastrophic system failure in the near future.",
+    cyber: "CONFIDENTIAL INCIDENT REPORT: IMMEDIATE ATTACK RESPONSE REQUIRED At 02:00 AM standard time, our internal monitoring systems detected a critical failure in the primary database firewall of our central corporate network.",
     finance: "Quarterly Financial Overview: The company achieved a record 24% growth in operating revenue driven by strong enterprise software adoption.",
     short: "I went to school today."
 };
@@ -143,10 +148,14 @@ async function parseApiResponse(response) {
     throw new Error("Beklenmeyen yanıt biçimi alındı.");
 }
 
-// PDF Gönderme
+// Dosya (PDF veya Görsel) İşleme & Gönderme
 async function handleFile(file) {
-    if (!file.name.toLowerCase().endsWith('.pdf')) {
-        showToast("Lütfen sadece geçerli bir .PDF dosyası seçin.", "warning");
+    const fileName = file.name.toLowerCase();
+    const isPdf = fileName.endsWith('.pdf');
+    const isImage = IMAGE_EXTENSIONS.some(ext => fileName.endsWith(ext));
+
+    if (!isPdf && !isImage) {
+        showToast("Lütfen sadece geçerli bir .PDF veya Görsel (.PNG, .JPG, .JPEG, .WEBP) dosyası seçin.", "warning");
         return;
     }
 
@@ -156,13 +165,22 @@ async function handleFile(file) {
     }
 
     setLoading(true);
+    if (isImage) {
+        if (loaderTitle) loaderTitle.textContent = "Görsel OCR ile Taranıyor";
+        if (loaderSubtext) loaderSubtext.textContent = "AI Vision & OCR motoru ile görseldeki metinler okunuyor ve analiz ediliyor...";
+    } else {
+        if (loaderTitle) loaderTitle.textContent = "Yapay Zekâ Analiz Ediyor";
+        if (loaderSubtext) loaderSubtext.textContent = "PDF ayrıştırılıyor, taranmış sayfalar OCR ile taranıyor ve özetleniyor...";
+    }
     hideToast();
 
     const formData = new FormData();
     formData.append("file", file);
 
+    const endpoint = isPdf ? `${API_URL}/analyze-pdf` : `${API_URL}/analyze-image`;
+
     try {
-        const response = await fetch(`${API_URL}/analyze-pdf`, {
+        const response = await fetch(endpoint, {
             method: "POST",
             body: formData
         });
@@ -184,6 +202,8 @@ analyzeTextBtn.addEventListener('click', async () => {
     }
 
     setLoading(true);
+    if (loaderTitle) loaderTitle.textContent = "Metin Analiz Ediliyor";
+    if (loaderSubtext) loaderSubtext.textContent = "Groq LLaMA-3.3 ile soyutlayıcı özetleme, sınıflandırma ve risk analizi yapılıyor...";
     hideToast();
 
     try {
@@ -292,17 +312,44 @@ function getRiskBadge(level, score) {
     return `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 font-extrabold text-xs">🛡️ Düşük Risk (Skor: ${score})</span>`;
 }
 
+// Okuma Yöntemi Rozeti
+function getMethodBadge(method, pageCount) {
+    let methodText = '✍️ Metin Girişi';
+    let badgeClass = 'bg-slate-800 text-slate-300 border-slate-700';
+
+    if (method === 'vision_ocr') {
+        methodText = '⚡ AI Vision OCR';
+        badgeClass = 'bg-purple-500/15 text-purple-300 border-purple-500/40';
+    } else if (method === 'tesseract_ocr' || method === 'ocr') {
+        methodText = '🔍 OCR (Taranmış Doküman)';
+        badgeClass = 'bg-cyan-500/15 text-cyan-300 border-cyan-500/40';
+    } else if (method === 'digital') {
+        methodText = '📄 Dijital PDF Metni';
+        badgeClass = 'bg-blue-500/15 text-blue-300 border-blue-500/40';
+    }
+
+    const pages = pageCount ? `<span class="ml-1.5 opacity-80">(${pageCount} Sayfa)</span>` : '';
+    return `<span class="inline-flex items-center px-2 py-0.5 rounded-md border text-[11px] font-semibold ${badgeClass}">${methodText}${pages}</span>`;
+}
+
 // Sonuç Gösterimi
 function displayResults(data) {
     loader.classList.add('hidden');
     
     const riskBadge = getRiskBadge(data.risk_level, data.risk_score);
+    const methodBadge = getMethodBadge(data.extraction_method, data.page_count);
     const isTurkish = (data.language === 'tr');
     const langBadgeClass = isTurkish ? 'lang-badge-tr' : 'lang-badge-en';
     const langFlag = isTurkish ? '🇹🇷' : '🇬🇧';
     const langName = data.language_label || (isTurkish ? 'Türkçe' : 'English');
     
     resultsDiv.innerHTML = `
+        <!-- Üst Metot ve Durum Barı -->
+        <div class="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-950/70 border border-slate-800/80 text-xs">
+            <span class="text-slate-400 font-medium">İşlem Modeli & Okuma:</span>
+            <div>${methodBadge}</div>
+        </div>
+
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <!-- 1. Belge Dili -->
             <div class="p-3.5 sm:p-4 rounded-xl glass-inner flex flex-col justify-between">
