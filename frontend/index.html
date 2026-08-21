@@ -3,14 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI Doküman Analizi, OCR & Risk Değerlendirme (Çok Dilli)</title>
-    <meta name="description" content="PDF, taranmış belgeler, görseller ve metin dosyalarını OCR ve yapay zeka ile özetleyen, kategorize eden, anahtar kelimeleri ve güvenlik riskini hesaplayan çok dilli sistem.">
+    <title>AI Doküman Analizi, OCR & KVKK Maskeleme</title>
+    <meta name="description" content="PDF, görseller ve metin dosyalarını yapay zekâ ile özetleyen, KVKK/PII kişisel verilerini maskeleyen ve güvenlik risklerini değerlendiren akıllı platform.">
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="style.css?v=1.0.2">
+    <link rel="stylesheet" href="style.css?v=1.0.3">
+    <style>
+        html { scroll-behavior: smooth; }
+        .highlight-pulse { animation: pulseBorder 1.5s ease-in-out; }
+        @keyframes pulseBorder {
+            0%, 100% { border-color: rgba(16, 185, 129, 0.3); }
+            50% { border-color: rgba(16, 185, 129, 0.9); box-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
+        }
+    </style>
 </head>
 <body class="p-3 sm:p-6 md:p-8 flex flex-col items-center justify-center min-h-screen py-6">
 
-    <!-- Ana Konteyner (Dengeli ve İdeal Boyut: max-w-3xl) -->
+    <!-- Ana Konteyner -->
     <main class="w-full max-w-3xl glass-card rounded-2xl sm:rounded-3xl shadow-2xl p-4 sm:p-7 md:p-9 neon-glow relative overflow-hidden my-auto">
         
         <!-- Bildirim / Toast Alanı -->
@@ -19,45 +27,49 @@
         <!-- Üst Başlık & Rozet -->
         <header class="text-center mb-6">
             <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/25 text-blue-400 text-xs font-semibold mb-2.5">
-                <span class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-ping"></span>
-                FastAPI • Çok Dilli AI • Groq LLaMA & OCR Motoru
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                🛡️ Güvenli Doküman Analizi & KVKK Veri Maskeleme
             </div>
             <h1 class="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight mb-2">
                 <span class="neon-text">Doc Analysis AI</span> 🤖
             </h1>
             <div class="flex items-center justify-center gap-2 mt-2">
                 <button type="button" onclick="openMetricsModal()" class="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 text-xs font-semibold transition flex items-center gap-1.5">
-                    📊 Canlı Sistem Metrikleri & Webhook (Faz 5)
+                    📊 Canlı Sistem Metrikleri & Webhook
                 </button>
             </div>
         </header>
 
-        <!-- Sekme Seçimi -->
-        <div class="flex p-1 bg-slate-950/80 border border-slate-800 rounded-xl mb-5 text-xs sm:text-sm font-semibold">
-            <button id="tab-pdf" type="button" class="flex-1 py-2.5 px-3 rounded-lg font-bold text-blue-400 bg-slate-800/90 shadow transition-all flex items-center justify-center gap-2">
-                📄 Doküman Analizi (PDF / Görsel / Toplu)
+        <!-- Sekme Seçimi (4 Temiz Sekme) -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 p-1 bg-slate-950/80 border border-slate-800 rounded-xl mb-5 text-xs sm:text-sm font-semibold gap-1">
+            <button id="tab-pdf" type="button" class="py-2.5 px-2 rounded-lg font-bold text-blue-400 bg-slate-800/90 shadow transition-all flex items-center justify-center gap-1.5">
+                📄 Doküman Yükleme
             </button>
-            <button id="tab-text" type="button" class="flex-1 py-2.5 px-3 rounded-lg font-bold text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center gap-2">
-                ✍️ Metin Girişi
+            <button id="tab-kvkk" type="button" class="py-2.5 px-2 rounded-lg font-bold text-emerald-400 hover:text-emerald-200 transition-all flex items-center justify-center gap-1.5">
+                🛡️ KVKK Maskeleme
             </button>
-            <button id="tab-phase4" type="button" class="flex-1 py-2.5 px-3 rounded-lg font-bold text-indigo-400 hover:text-indigo-200 transition-all flex items-center justify-center gap-2">
-                ⚖️ Doküman Karşılaştırma & Diff
+            <button id="tab-text" type="button" class="py-2.5 px-2 rounded-lg font-bold text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center gap-1.5">
+                ✍️ Metin Analizi
+            </button>
+            <button id="tab-compare" type="button" class="py-2.5 px-2 rounded-lg font-bold text-indigo-400 hover:text-indigo-200 transition-all flex items-center justify-center gap-1.5">
+                ⚖️ Karşılaştırma
             </button>
         </div>
 
-        <!-- 1. MOD: PDF, Görsel ve Toplu Doküman Yükleme Bölümü -->
+        <!-- 1. SEKMELİ BÖLÜM: PDF, Görsel ve Doküman Yükleme -->
         <section id="pdf-section" class="space-y-3.5">
             <div id="drop-zone" class="border-2 border-dashed border-slate-700/80 rounded-2xl p-6 sm:p-8 text-center cursor-pointer hover:border-blue-500 hover:bg-slate-800/30 active:scale-[0.99] transition-all duration-200">
                 <div class="w-12 h-12 sm:w-14 sm:h-14 mx-auto mb-3 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
                     <svg class="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
                 </div>
-                <p class="text-sm sm:text-base font-bold text-slate-100">PDF, Görsel veya TXT dosyalarınızı buraya sürükleyin</p>
-                <p class="text-xs text-slate-400 mt-1">Tekil analiz için 1 dosya, toplu analiz için birden fazla dosya seçebilirsiniz (.PDF, .PNG, .JPG, .JPEG, .WEBP, .TXT — Maks. 15MB)</p>
+                <p class="text-sm sm:text-base font-bold text-slate-100">PDF, Görsel veya TXT dosyalarınızı buraya bırakın</p>
+                <p class="text-xs text-slate-400 mt-1">Tekil veya toplu analiz için dosya(lar) seçebilirsiniz (.PDF, .PNG, .JPG, .JPEG, .WEBP, .TXT — Maks. 15MB)</p>
                 
                 <div class="mt-3 flex flex-wrap justify-center gap-1.5 text-[11px] text-slate-400">
-                    <span class="px-2 py-0.5 rounded bg-slate-800/80 border border-slate-700">📄 Tekil PDF / Görsel</span>
-                    <span class="px-2 py-0.5 rounded bg-slate-800/80 border border-slate-700">📦 Toplu Doküman (Batch)</span>
-                    <span class="px-2 py-0.5 rounded bg-slate-800/80 border border-slate-700">🔍 OCR & Metin Çıkarma</span>
+                    <span class="px-2 py-0.5 rounded bg-slate-800/80 border border-slate-700">📄 PDF / Görsel</span>
+                    <span class="px-2 py-0.5 rounded bg-slate-800/80 border border-slate-700">📦 Toplu Doküman</span>
+                    <span class="px-2 py-0.5 rounded bg-slate-800/80 border border-slate-700">🔍 OCR Metin Okuma</span>
+                    <span class="px-2 py-0.5 rounded bg-slate-800/80 border border-slate-700">🛡️ Otomatik PII Maskeleme</span>
                 </div>
 
                 <button type="button" class="mt-4 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs sm:text-sm font-semibold text-slate-200 rounded-lg border border-slate-700 transition shadow">
@@ -73,7 +85,42 @@
             </button>
         </section>
 
-        <!-- 2. MOD: Metin Giriş Bölümü -->
+        <!-- 2. SEKMELİ BÖLÜM: Doğrudan KVKK / PII Veri Maskeleme Modu -->
+        <section id="kvkk-section" class="hidden space-y-3.5">
+            <div class="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-start gap-2.5">
+                <span class="text-base">🛡️</span>
+                <div>
+                    <strong class="font-bold block text-sm">Hızlı Kişisel Veri (KVKK / PII) Maskeleme</strong>
+                    <span>Metninizdeki TCKN, İsim, E-posta, Telefon, IBAN, Kredi Kartı ve IP adresleri anında [MASKELENDİ] formatına çevrilir.</span>
+                </div>
+            </div>
+            
+            <div class="relative">
+                <textarea id="kvkk-text-input" rows="5" class="w-full p-3.5 sm:p-4 bg-slate-950/90 border border-emerald-500/30 rounded-xl focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 focus:outline-none text-slate-100 text-xs sm:text-sm placeholder-slate-500 transition leading-relaxed resize-y" placeholder="Hassas veri içeren metni yapıştırın (örn. İsim, TCKN, IBAN, Telefon numaraları)..."></textarea>
+                <div class="flex justify-between items-center px-1.5 mt-1 text-xs text-slate-400">
+                    <span id="kvkk-char-count">0 karakter</span>
+                    <button id="clear-kvkk-text-btn" type="button" class="hover:text-rose-400 transition font-medium">Temizle</button>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+                <span class="text-xs text-slate-400 font-semibold">⚡ Hızlı Test Örneği:</span>
+                <div class="flex gap-2">
+                    <button type="button" onclick="loadSample('tr_kvkk')" class="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-300 text-xs font-semibold transition">
+                        🇹🇷 Türkçe KVKK Örneği
+                    </button>
+                    <button type="button" onclick="loadSample('en_kvkk')" class="px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/30 hover:bg-blue-500/20 text-blue-300 text-xs font-semibold transition">
+                        🇬🇧 English PII Sample
+                    </button>
+                </div>
+            </div>
+
+            <button id="analyze-kvkk-btn" type="button" class="w-full py-3 sm:py-3.5 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white rounded-xl font-bold text-xs sm:text-sm md:text-base transition shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 mt-3">
+                🛡️ Hassas Verileri Maskele ve Temizle
+            </button>
+        </section>
+
+        <!-- 3. SEKMELİ BÖLÜM: Genel Metin Analizi -->
         <section id="text-section" class="hidden space-y-3.5">
             <div class="relative">
                 <textarea id="text-input" rows="5" class="w-full p-3.5 sm:p-4 bg-slate-950/90 border border-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 focus:outline-none text-slate-100 text-xs sm:text-sm md:text-base placeholder-slate-500 transition leading-relaxed resize-y" placeholder="Analiz edilmesini istediğiniz Türkçe veya İngilizce metni buraya yazın veya yapıştırın..."></textarea>
@@ -83,16 +130,13 @@
                 </div>
             </div>
 
-            <!-- Ayrıştırılmış & Net Hızlı Örnek Düğmeleri -->
+            <!-- Örnek Test Butonları -->
             <div class="pt-1 space-y-2">
                 <p class="text-xs text-slate-400 font-semibold flex items-center gap-1">
                     <span>⚡ Hızlı Test Örnekleri:</span>
                 </p>
                 
-                <!-- Türkçe ve İngilizce Ayrık Grid -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    
-                    <!-- Türkçe Grubu -->
                     <div class="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-1.5">
                         <span class="text-[11px] font-bold text-red-400 flex items-center gap-1 uppercase tracking-wider">
                             🇹🇷 Türkçe Örnekler
@@ -117,7 +161,6 @@
                         </div>
                     </div>
 
-                    <!-- İngilizce Grubu -->
                     <div class="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-1.5">
                         <span class="text-[11px] font-bold text-blue-400 flex items-center gap-1 uppercase tracking-wider">
                             🇬🇧 English Samples
@@ -141,8 +184,6 @@
                             </button>
                         </div>
                     </div>
-
-
                 </div>
             </div>
 
@@ -151,7 +192,7 @@
             </button>
         </section>
 
-        <!-- 3. MOD: Doküman Karşılaştırma & Diff Bölümü -->
+        <!-- 4. SEKMELİ BÖLÜM: Doküman Karşılaştırma -->
         <section id="phase4-section" class="hidden space-y-4">
             <div id="p4-compare-view" class="space-y-3">
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -170,11 +211,10 @@
                     </button>
                 </div>
                 <button id="compare-docs-btn" type="button" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 active:scale-[0.99] text-white rounded-xl font-bold text-xs sm:text-sm transition shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2">
-                    ⚖️ İki Dokümanı Karşılaştır & Diff Çıkar
+                    ⚖️ İki Dokümanı Karşılaştır
                 </button>
             </div>
         </section>
-
 
         <!-- Yükleniyor Göstergesi -->
         <div id="loader" class="hidden my-8 text-center py-6 animate-fade-in">
@@ -182,7 +222,7 @@
                 <div class="w-12 h-12 rounded-full border-2 border-blue-500/20 border-t-blue-500 animate-spin"></div>
             </div>
             <p id="loader-title" class="text-slate-100 font-bold mt-3 text-sm sm:text-base">Yapay Zekâ Analiz Ediyor</p>
-            <p id="loader-subtext" class="text-slate-400 text-xs mt-1">Groq LLaMA-3.3 ve OCR motoru ile metin ayrıştırma, özetleme ve risk analizi yapılıyor...</p>
+            <p id="loader-subtext" class="text-slate-400 text-xs mt-1">Doküman metni ayrıştırılıyor, KVKK maskelemesi ve güvenlik risk haritası çıkarılıyor...</p>
         </div>
 
         <!-- Sonuç Bölümü -->
@@ -192,12 +232,12 @@
 
     </main>
 
-    <!-- FAZ 5: Sistem Metrikleri & Webhook Modal Overlay -->
+    <!-- Sistem Metrikleri & Webhook Modal -->
     <div id="metrics-modal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-2xl space-y-4 text-slate-100">
             <div class="flex items-center justify-between border-b border-slate-800 pb-3">
                 <h3 class="text-base font-bold text-emerald-400 flex items-center gap-2">
-                    📊 Canlı Sistem Metrikleri & Webhook (Faz 5)
+                    📊 Canlı Sistem Metrikleri & Webhook
                 </h3>
                 <button type="button" onclick="closeMetricsModal()" class="text-slate-400 hover:text-white text-lg font-bold">✕</button>
             </div>
@@ -239,6 +279,6 @@
         </div>
     </div>
 
-    <script src="app.js?v=1.0.5"></script>
+    <script src="app.js?v=1.0.6"></script>
 </body>
 </html>

@@ -1,10 +1,13 @@
 // DOM Elemanları
 const tabPdf = document.getElementById('tab-pdf');
+const tabKvkk = document.getElementById('tab-kvkk');
 const tabText = document.getElementById('tab-text');
-const tabPhase4 = document.getElementById('tab-phase4');
+const tabCompare = document.getElementById('tab-compare') || document.getElementById('tab-phase4');
+
 const pdfSection = document.getElementById('pdf-section');
+const kvkkSection = document.getElementById('kvkk-section');
 const textSection = document.getElementById('text-section');
-const phase4Section = document.getElementById('phase4-section');
+const compareSection = document.getElementById('phase4-section');
 
 const compareDoc1 = document.getElementById('compare-doc1');
 const compareDoc2 = document.getElementById('compare-doc2');
@@ -14,6 +17,11 @@ const dropZone = document.getElementById('drop-zone');
 const fileInput = document.getElementById('file-input');
 const selectedFilesContainer = document.getElementById('selected-files-container');
 const analyzeFileBtn = document.getElementById('analyze-file-btn');
+
+const kvkkTextInput = document.getElementById('kvkk-text-input');
+const analyzeKvkkBtn = document.getElementById('analyze-kvkk-btn');
+const clearKvkkTextBtn = document.getElementById('clear-kvkk-text-btn');
+const kvkkCharCount = document.getElementById('kvkk-char-count');
 
 const textInput = document.getElementById('text-input');
 const analyzeTextBtn = document.getElementById('analyze-text-btn');
@@ -92,31 +100,60 @@ function hideToast() {
 }
 window.hideToast = hideToast;
 
+function scrollToSection(sectionId) {
+    const el = document.getElementById(sectionId);
+    if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('highlight-pulse');
+        setTimeout(() => el.classList.remove('highlight-pulse'), 1600);
+    }
+}
+window.scrollToSection = scrollToSection;
+
+function switchTab(tabName) {
+    activeTab = tabName;
+    const inactiveClass = 'py-2.5 px-2 rounded-lg font-bold text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center gap-1.5';
+    
+    if (tabPdf) tabPdf.className = tabName === 'pdf' ? 'py-2.5 px-2 rounded-lg font-bold text-blue-400 bg-slate-800/90 shadow transition-all flex items-center justify-center gap-1.5' : inactiveClass;
+    if (tabKvkk) tabKvkk.className = tabName === 'kvkk' ? 'py-2.5 px-2 rounded-lg font-bold text-emerald-400 bg-slate-800/90 shadow transition-all flex items-center justify-center gap-1.5' : inactiveClass;
+    if (tabText) tabText.className = tabName === 'text' ? 'py-2.5 px-2 rounded-lg font-bold text-blue-400 bg-slate-800/90 shadow transition-all flex items-center justify-center gap-2' : inactiveClass;
+    if (tabCompare) tabCompare.className = tabName === 'compare' ? 'py-2.5 px-2 rounded-lg font-bold text-indigo-400 bg-slate-800/90 shadow transition-all flex items-center justify-center gap-1.5' : inactiveClass;
+
+    if (pdfSection) pdfSection.classList.toggle('hidden', tabName !== 'pdf');
+    if (kvkkSection) kvkkSection.classList.toggle('hidden', tabName !== 'kvkk');
+    if (textSection) textSection.classList.toggle('hidden', tabName !== 'text');
+    if (compareSection) compareSection.classList.toggle('hidden', tabName !== 'compare');
+    if (resultsDiv) resultsDiv.classList.add('hidden');
+    hideToast();
+}
+
+if (tabPdf) tabPdf.addEventListener('click', () => switchTab('pdf'));
+if (tabKvkk) tabKvkk.addEventListener('click', () => switchTab('kvkk'));
+if (tabText) tabText.addEventListener('click', () => switchTab('text'));
+if (tabCompare) tabCompare.addEventListener('click', () => switchTab('compare'));
+
 function setLoading(isLoading) {
     if (isLoading) {
         if (pdfSection) pdfSection.classList.add('hidden');
+        if (kvkkSection) kvkkSection.classList.add('hidden');
         if (textSection) textSection.classList.add('hidden');
-        if (phase4Section) phase4Section.classList.add('hidden');
+        if (compareSection) compareSection.classList.add('hidden');
         if (tabPdf && tabPdf.parentElement) tabPdf.parentElement.classList.add('hidden');
         if (resultsDiv) resultsDiv.classList.add('hidden');
         if (loader) loader.classList.remove('hidden');
     } else {
         if (loader) loader.classList.add('hidden');
         if (tabPdf && tabPdf.parentElement) tabPdf.parentElement.classList.remove('hidden');
-        if (activeTab === 'pdf') {
-            if (pdfSection) pdfSection.classList.remove('hidden');
-        } else if (activeTab === 'text') {
-            if (textSection) textSection.classList.remove('hidden');
-        } else if (activeTab === 'phase4') {
-            if (phase4Section) phase4Section.classList.remove('hidden');
-        }
+        switchTab(activeTab);
     }
 }
 
 function resetAnalysis() {
     if (resultsDiv) { resultsDiv.classList.add('hidden'); resultsDiv.innerHTML = ''; }
     if (textInput) textInput.value = '';
+    if (kvkkTextInput) kvkkTextInput.value = '';
     if (charCount) charCount.textContent = '0 karakter';
+    if (kvkkCharCount) kvkkCharCount.textContent = '0 karakter';
     if (fileInput) fileInput.value = '';
     if (selectedFilesContainer) { selectedFilesContainer.classList.add('hidden'); selectedFilesContainer.innerHTML = ''; }
     selectedFilesList = [];
@@ -133,51 +170,15 @@ function resetAnalysis() {
 }
 window.resetAnalysis = resetAnalysis;
 
-if (tabPdf) {
-    tabPdf.addEventListener('click', () => {
-        activeTab = 'pdf';
-        tabPdf.className = 'flex-1 py-2.5 px-3 rounded-lg font-bold text-blue-400 bg-slate-800/90 shadow transition-all flex items-center justify-center gap-2';
-        if (tabText) tabText.className = 'flex-1 py-2.5 px-3 rounded-lg font-bold text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center gap-2';
-        if (tabPhase4) tabPhase4.className = 'flex-1 py-2.5 px-3 rounded-lg font-bold text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center gap-2';
-        if (pdfSection) pdfSection.classList.remove('hidden');
-        if (textSection) textSection.classList.add('hidden');
-        if (phase4Section) phase4Section.classList.add('hidden');
-        if (resultsDiv) resultsDiv.classList.add('hidden');
-        hideToast();
-    });
-}
-
-if (tabText) {
-    tabText.addEventListener('click', () => {
-        activeTab = 'text';
-        tabText.className = 'flex-1 py-2.5 px-3 rounded-lg font-bold text-blue-400 bg-slate-800/90 shadow transition-all flex items-center justify-center gap-2';
-        if (tabPdf) tabPdf.className = 'flex-1 py-2.5 px-3 rounded-lg font-bold text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center gap-2';
-        if (tabPhase4) tabPhase4.className = 'flex-1 py-2.5 px-3 rounded-lg font-bold text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center gap-2';
-        if (textSection) textSection.classList.remove('hidden');
-        if (pdfSection) pdfSection.classList.add('hidden');
-        if (phase4Section) phase4Section.classList.add('hidden');
-        if (resultsDiv) resultsDiv.classList.add('hidden');
-        hideToast();
-    });
-}
-
-if (tabPhase4) {
-    tabPhase4.addEventListener('click', () => {
-        activeTab = 'phase4';
-        tabPhase4.className = 'flex-1 py-2.5 px-3 rounded-lg font-bold text-indigo-400 bg-slate-800/90 shadow transition-all flex items-center justify-center gap-2';
-        if (tabPdf) tabPdf.className = 'flex-1 py-2.5 px-3 rounded-lg font-bold text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center gap-2';
-        if (tabText) tabText.className = 'flex-1 py-2.5 px-3 rounded-lg font-bold text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center gap-2';
-        if (phase4Section) phase4Section.classList.remove('hidden');
-        if (pdfSection) pdfSection.classList.add('hidden');
-        if (textSection) textSection.classList.add('hidden');
-        if (resultsDiv) resultsDiv.classList.add('hidden');
-        hideToast();
-    });
-}
-
 if (textInput) {
     textInput.addEventListener('input', () => {
         if (charCount) charCount.textContent = `${textInput.value.length} karakter`;
+    });
+}
+
+if (kvkkTextInput) {
+    kvkkTextInput.addEventListener('input', () => {
+        if (kvkkCharCount) kvkkCharCount.textContent = `${kvkkTextInput.value.length} karakter`;
     });
 }
 
@@ -189,24 +190,37 @@ if (clearTextBtn) {
     });
 }
 
+if (clearKvkkTextBtn) {
+    clearKvkkTextBtn.addEventListener('click', () => {
+        if (kvkkTextInput) kvkkTextInput.value = '';
+        if (kvkkCharCount) kvkkCharCount.textContent = '0 karakter';
+        hideToast();
+    });
+}
+
 const SAMPLES = {
-    tr_cyber: "GİZLİ OLAY RAPORU: ACİL SALDIRI MÜDAHALESİ GEREKLİDİR Saat 02:00 sularında dahili izleme sistemlerimiz, merkezi kurumsal ağımızın birincil veritabanı güvenlik duvarında kritik bir arıza tespit etti. Son derece koordineli bir siber saldırı, bulut altyapımızda yeni keşfedilen bir sıfır gün güvenlik açığını başarıyla istismar ederek benzeri görülmemiş büyüklükte bir veri ihlaline yol açtı. Kötü niyetli saldırganlar ikincil kimlik doğrulama protokollerini ve şifreleme katmanlarını atlatmayı başararak müşterilerimizin son derece gizli finansal kayıtları için ciddi bir tehdit oluşturdu. Güvenliği ihlal edilen sunucular derhal izole edilip çevrimdışı bırakılmazsa büyük bir veri sızıntısının gerçekleşme olasılığı yüksek olduğundan, küresel olay müdahale ekibimiz tüm departmanlarda resmi olarak acil durum ilan etti. Tüm sistem yöneticilerinin, geliştiricilerin ve personelin kimlik bilgilerini sıfırlaması ve tespit edilen güvenlik açığını bir saat içinde yamaması kesinlikle ve acilen gerekmektedir. Bu ihlal, operasyonel bütünlüğümüz ve pazar itibarımız için kritik bir tehdit oluşturmaktadır. Saldırının tam kapsamını anlamak ve gelecekte başka bir saldırıyı veya yıkıcı sistem çökmesini önlemek amacıyla acil bir güvenlik denetimi ve adli bilişim analizi yürütülmektedir.",
+    tr_cyber: "GİZLİ OLAY RAPORU: ACİL SALDIRI MÜDAHALESİ GEREKLİDİR Saat 02:00 sularında dahili izleme sistemlerimiz, merkezi kurumsal ağımızın birincil veritabanı güvenlik duvarında kritik bir arıza tespit etti. Son derece koordineli bir siber saldırı, bulut altyapımızda yeni keşfedilen bir sıfır gün güvenlik açığını başarıyla istismar ederek benzeri görülmemiş büyüklükte bir veri ihlaline yol açtı. Kötü niyetli saldırganlar ikincil kimlik doğrulama protokollerini ve şifreleme katmanlarını atlatmayı başararak müşterilerimizin son derece gizli finansal kayıtları için ciddi bir tehdit oluşturdu.",
     tr_kvkk: "MÜŞTERİ HESAP EKSTRESİ VE GİZLİ BİLDİRİM:\nSayın Ahmet Yılmaz, 10000000146 T.C. Kimlik numaranıza ait TR12 3456 7890 1234 5678 9012 34 IBAN numaralı hesabınızdan 4543-1234-5678-9012 numaralı kredi kartınıza ödeme yapılmıştır. Detaylı bilgi için müşteri temsilciniz ile ahmet.yilmaz@kurumsal.com veya 0532 123 45 67 üzerinden iletişime geçebilirsiniz. Güvenlik bağlantı IP adresi: 192.168.1.105.",
     tr_finance: "Üçüncü Çeyrek Finansal Raporu: Şirketimiz bulut ve yapay zekâ yazılım ürünlerine olan yüksek talep sayesinde faaliyet gelirlerinde %28 oranında rekor büyüme kaydetti. İşletme giderleri %6 oranında azalırken net kâr marjı güçlendi ve serbest nakit akışı genişledi.",
     tr_short: "Bugün üniversitede yapay zekâ ve derin öğrenme modelleri üzerine kapsamlı bir ders işlendi.",
-    en_cyber: "CONFIDENTIAL INCIDENT REPORT: IMMEDIATE ATTACK RESPONSE REQUIRED At 02:00 AM standard time, our internal monitoring systems detected a critical failure in the primary database firewall of our central corporate network. A highly coordinated cyber attack successfully exploited a newly discovered zero-day vulnerability in our cloud infrastructure, leading to a massive and unprecedented data breach. The malicious actors managed to bypass the secondary authentication protocols and encryption layers, posing a severe threat to our clients' highly confidential financial records. Our global incident response team has officially declared a state of emergency across all departments, as there is a high probability of an imminent data leak if the compromised servers are not isolated and taken offline immediately. It is absolutely urgent that all system administrators, developers, and staff reset their credentials and patch the identified vulnerability within the next hour. This breach represents a critical threat to our operational integrity and overall market reputation. An urgent security audit and forensic analysis are currently underway to understand the full scope of the intrusion and to prevent any further attack or catastrophic system failure in the near future.",
+    en_cyber: "CONFIDENTIAL INCIDENT REPORT: IMMEDIATE ATTACK RESPONSE REQUIRED At 02:00 AM standard time, our internal monitoring systems detected a critical failure in the primary database firewall of our central corporate network. A highly coordinated cyber attack successfully exploited a newly discovered zero-day vulnerability in our cloud infrastructure, leading to a massive data breach.",
     en_kvkk: "EMPLOYEE CONFIDENTIAL RECORD:\nEmployee Dr. John Watson with SSN 123-45-6789 and company email john.watson@enterprise.com has been assigned internal server IP 10.0.0.45. Emergency phone contact is +1 (555) 234-5678. Corporate card: 4111-2222-3333-4444.",
     en_finance: "Quarterly Financial Overview: The company achieved a record 24% growth in operating revenue driven by strong enterprise software adoption. Operating expenses decreased by 8%, resulting in improved net profit margins and sustainable free cash flow expansion.",
     en_short: "FastAPI is a modern, high-performance web framework for building APIs with Python."
 };
 
 function loadSample(type) {
-    if (SAMPLES[type] && textInput) {
-        textInput.value = SAMPLES[type];
-        if (charCount) charCount.textContent = `${textInput.value.length} karakter`;
-        if (activeTab !== 'text' && tabText) tabText.click();
-        hideToast();
+    if (!SAMPLES[type]) return;
+    if (type.includes('kvkk')) {
+        if (kvkkTextInput) kvkkTextInput.value = SAMPLES[type];
+        if (kvkkCharCount) kvkkCharCount.textContent = `${SAMPLES[type].length} karakter`;
+        switchTab('kvkk');
+    } else {
+        if (textInput) textInput.value = SAMPLES[type];
+        if (charCount) charCount.textContent = `${SAMPLES[type].length} karakter`;
+        switchTab('text');
     }
+    hideToast();
 }
 window.loadSample = loadSample;
 
@@ -321,10 +335,10 @@ async function processSingleFile(file) {
     setLoading(true);
     if (isImage) {
         if (loaderTitle) loaderTitle.textContent = 'Görsel OCR ile Taranıyor';
-        if (loaderSubtext) loaderSubtext.textContent = 'AI Vision & OCR motoru ile görseldeki metinler okunuyor, KVKK ve risk analizi yapılıyor...';
+        if (loaderSubtext) loaderSubtext.textContent = 'Yapay zekâ görüş motoru ile metinler taranıyor ve KVKK verileri maskeleniyor...';
     } else {
         if (loaderTitle) loaderTitle.textContent = 'Yapay Zekâ Analiz Ediyor';
-        if (loaderSubtext) loaderSubtext.textContent = 'Doküman ayrıştırılıyor, OCR ile metinler okunuyor, KVKK maskelemesi ve özet çıkarılıyor...';
+        if (loaderSubtext) loaderSubtext.textContent = 'Doküman ayrıştırılıyor, KVKK maskelemesi ve özet çıkarılıyor...';
     }
     hideToast();
     const formData = new FormData();
@@ -357,6 +371,32 @@ async function processBatchFiles(files) {
     }
 }
 
+if (analyzeKvkkBtn) {
+    analyzeKvkkBtn.addEventListener('click', async () => {
+        const textContent = kvkkTextInput ? kvkkTextInput.value.trim() : '';
+        if (!textContent) {
+            showToast('Lütfen maskelenecek bir metin girin.', 'warning');
+            return;
+        }
+        setLoading(true);
+        if (loaderTitle) loaderTitle.textContent = 'Kişisel Veriler Maskeleniyor';
+        if (loaderSubtext) loaderSubtext.textContent = 'TCKN, İsim, E-posta, Telefon ve IBAN bilgileri ayıklanıp temizleniyor...';
+        hideToast();
+        try {
+            const response = await fetch(`${API_URL}/analyze-text`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: textContent })
+            });
+            const data = await parseApiResponse(response);
+            displayResults(data, true); // Auto-jump to masked text!
+        } catch (error) {
+            showToast(error.message, 'error');
+            setLoading(false);
+        }
+    });
+}
+
 if (analyzeTextBtn) {
     analyzeTextBtn.addEventListener('click', async () => {
         const textContent = textInput ? textInput.value.trim() : '';
@@ -366,7 +406,7 @@ if (analyzeTextBtn) {
         }
         setLoading(true);
         if (loaderTitle) loaderTitle.textContent = 'Metin Analiz Ediliyor';
-        if (loaderSubtext) loaderSubtext.textContent = 'Groq LLaMA-3.3, KVKK maskeleme ve çok dilli risk analizi yapılıyor...';
+        if (loaderSubtext) loaderSubtext.textContent = 'Yapay zekâ özeti, KVKK maskeleme ve risk analizi yapılıyor...';
         hideToast();
         try {
             const response = await fetch(`${API_URL}/analyze-text`, {
@@ -497,10 +537,10 @@ function copyMaskedDocument() {
             if (btn) {
                 const oldHtml = btn.innerHTML;
                 btn.innerHTML = '✓ Kopyalandı';
-                btn.classList.add('text-emerald-400', 'border-emerald-500/50');
+                btn.classList.add('text-emerald-400', 'border-emerald-500/50', 'bg-emerald-500/20');
                 setTimeout(() => {
                     btn.innerHTML = oldHtml;
-                    btn.classList.remove('text-emerald-400', 'border-emerald-500/50');
+                    btn.classList.remove('text-emerald-400', 'border-emerald-500/50', 'bg-emerald-500/20');
                 }, 2000);
             }
         });
@@ -588,10 +628,10 @@ function getMethodBadge(method, pageCount) {
         methodText = '⚡ AI Vision OCR';
         badgeClass = 'bg-purple-500/15 text-purple-300 border-purple-500/40';
     } else if (method === 'tesseract_ocr' || method === 'ocr') {
-        methodText = '🔍 OCR (Taranmış Doküman)';
+        methodText = '🔍 OCR ile Okundu';
         badgeClass = 'bg-cyan-500/15 text-cyan-300 border-cyan-500/40';
     } else if (method === 'digital') {
-        methodText = '📄 Dijital PDF Metni';
+        methodText = '📄 Dijital Metin';
         badgeClass = 'bg-blue-500/15 text-blue-300 border-blue-500/40';
     }
     const pages = pageCount ? `<span class="ml-1.5 opacity-80">(${pageCount} Sayfa)</span>` : '';
@@ -668,7 +708,7 @@ function askSuggestedQuestion(q) {
 }
 window.askSuggestedQuestion = askSuggestedQuestion;
 
-function displayResults(data) {
+function displayResults(data, autoScrollToMasked = false) {
     loader.classList.add('hidden');
     activeAnalysisData = data;
     activeDocumentText = data.cleaned_text || '';
@@ -693,7 +733,7 @@ function displayResults(data) {
     const riskReasons = data.risk_analysis?.reasons || [];
     let riskReasonsHtml = '';
     if (riskReasons.length > 0) {
-        riskReasonsHtml = `<div class="mt-2.5 pt-2.5 border-t border-slate-800 text-xs"><span class="text-slate-400 font-semibold block mb-1">Tespit Edilen Güvenlik Uyarısı / Tehdit Unsurları:</span><ul class="list-disc list-inside space-y-1 text-slate-300">${riskReasons.map(r => `<li class="text-rose-300">${escapeHtml(r)}</li>`).join('')}</ul></div>`;
+        riskReasonsHtml = `<div class="mt-2.5 pt-2.5 border-t border-slate-800 text-xs"><span class="text-slate-400 font-semibold block mb-1">Tespit Edilen Güvenlik Uyarıları:</span><ul class="list-disc list-inside space-y-1 text-slate-300">${riskReasons.map(r => `<li class="text-rose-300">${escapeHtml(r)}</li>`).join('')}</ul></div>`;
     }
 
     const kvkk = data.kvkk_report || {};
@@ -701,7 +741,7 @@ function displayResults(data) {
     if (data.pii_entities && data.pii_entities.length > 0) {
         piiBadgesHtml = data.pii_entities.map(p => `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-medium"><span class="font-bold text-rose-400">${escapeHtml(p.label)}:</span> ${escapeHtml(p.masked_value || p.text)}</span>`).join('');
     } else {
-        piiBadgesHtml = '<span class="text-xs text-emerald-400 font-semibold">🛡️ Temiz — Herhangi bir TCKN, İsim, E-posta veya Telefon sızıntısı bulunamadı.</span>';
+        piiBadgesHtml = '<span class="text-xs text-emerald-400 font-semibold">🛡️ Temiz — TCKN, İsim, E-posta veya Telefon sızıntısı bulunamadı.</span>';
     }
 
     const recs = data.action_recommendations || [];
@@ -710,7 +750,7 @@ function displayResults(data) {
 
     let anomalyCardHtml = '';
     if (isSuspicious || anomalies.length > 0) {
-        anomalyCardHtml = `<div class="p-4 rounded-xl bg-amber-500/10 border border-amber-500/40 text-amber-200 text-xs space-y-2"><div class="flex items-center gap-2 font-bold text-amber-400 text-sm"><span>⚠️</span><span>Anomali / Şüpheli Doküman Uyarısı (Faz 5)</span></div><ul class="list-disc list-inside space-y-1 font-mono text-[11px] text-amber-300">${anomalies.map(a => `<li>${escapeHtml(a)}</li>`).join('')}</ul></div>`;
+        anomalyCardHtml = `<div class="p-4 rounded-xl bg-amber-500/10 border border-amber-500/40 text-amber-200 text-xs space-y-2"><div class="flex items-center gap-2 font-bold text-amber-400 text-sm"><span>⚠️</span><span>Şüpheli İfade & Anomali Uyarısı</span></div><ul class="list-disc list-inside space-y-1 font-mono text-[11px] text-amber-300">${anomalies.map(a => `<li>${escapeHtml(a)}</li>`).join('')}</ul></div>`;
     }
 
     let defaultQuestions = isTurkish
@@ -721,6 +761,18 @@ function displayResults(data) {
 
     resultsDiv.innerHTML = `
         <div class="p-4 sm:p-6 rounded-2xl glass-inner border border-blue-500/30 shadow-2xl space-y-4 animate-fade-in">
+            
+            <!-- Hızlı Gezinti Çubuğu -->
+            <div class="flex flex-wrap items-center justify-between gap-1.5 p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs">
+                <span class="text-[11px] font-bold text-slate-400 flex items-center gap-1 pl-1">🚀 Hızlı Erişim:</span>
+                <div class="flex flex-wrap gap-1">
+                    <button type="button" onclick="scrollToSection('summary-section')" class="px-2.5 py-1 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-300 font-semibold transition">✨ Özet</button>
+                    <button type="button" onclick="scrollToSection('masked-text-section')" class="px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 font-extrabold transition">🛡️ KVKK Maskeli Metin</button>
+                    <button type="button" onclick="scrollToSection('chat-section')" class="px-2.5 py-1 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 text-indigo-300 font-semibold transition">💬 Soru Sor</button>
+                    <button type="button" onclick="scrollToSection('export-section')" class="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 font-semibold transition">📥 İndir</button>
+                </div>
+            </div>
+
             <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
                 <div class="flex items-center gap-2 flex-wrap">
                     <span class="text-sm sm:text-base font-bold text-slate-100">${categoryText}</span>
@@ -751,10 +803,11 @@ function displayResults(data) {
 
             ${anomalyCardHtml}
 
-            <div class="p-4 rounded-xl bg-slate-950/90 border border-blue-500/20 space-y-2 relative">
+            <!-- 1. Özeti Bölümü -->
+            <div id="summary-section" class="p-4 rounded-xl bg-slate-950/90 border border-blue-500/20 space-y-2 relative transition-all">
                 <div class="flex items-center justify-between flex-wrap gap-2 border-b border-slate-800/80 pb-2">
                     <div class="flex items-center gap-2">
-                        <span class="text-xs font-bold text-blue-400 uppercase tracking-wider">✨ Yapay Zekâ Özeti (Groq LLaMA-3.3)</span>
+                        <span class="text-xs font-bold text-blue-400 uppercase tracking-wider">✨ Akıllı Doküman Özeti</span>
                     </div>
                     <div class="flex items-center gap-1.5">
                         <button id="translate-btn" onclick="toggleSummaryTranslation()" class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 hover:border-indigo-500 text-xs font-semibold text-slate-300 transition">🌐 ${targetLangLabel}'ye Çevir</button>
@@ -769,23 +822,31 @@ function displayResults(data) {
                 <div class="flex flex-wrap gap-1.5">${keywordsHtml}</div>
             </div>
 
-            <div class="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
-                <div class="flex items-center justify-between">
-                    <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">🔒 İşlenmiş Doküman Metni (PII Maskeli)</span>
+            <!-- 2. KVKK / PII Maskelenmiş Metin Bölümü -->
+            <div id="masked-text-section" class="p-4 rounded-xl bg-slate-950/90 border border-emerald-500/30 space-y-2.5 transition-all">
+                <div class="flex items-center justify-between flex-wrap gap-2 border-b border-slate-800 pb-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <span>🔒</span> İşlenmiş Doküman Metni (PII Maskeli)
+                        </span>
+                    </div>
                     <div class="flex gap-2">
                         <button id="toggle-mask-btn" onclick="toggleMaskedTextView()" class="text-xs font-semibold px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:bg-amber-500/30 transition">👁️ Orijinal Metni Gör</button>
-                        <button id="copy-masked-btn" onclick="copyMaskedDocument()" class="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-slate-300 hover:border-slate-500 transition">📋 Metni Kopyala</button>
+                        <button id="copy-masked-btn" onclick="copyMaskedDocument()" class="text-xs font-bold px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition shadow shadow-emerald-600/30 flex items-center gap-1">
+                            📋 Maskeli Metni Kopyala
+                        </button>
                     </div>
                 </div>
-                <div id="document-text-content" class="p-3 rounded-lg bg-slate-900/90 border border-slate-800/80 text-xs font-mono text-slate-300 max-h-48 overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                <p class="text-[11px] text-slate-400">Metindeki tüm kişisel veriler (TCKN, İsim, E-posta, Telefon, IBAN) ayıklanıp [MASKELENDİ] etiketleriyle değiştirilmiştir. Bu metni güvenle kopyalayıp kullanabilirsiniz.</p>
+                <div id="document-text-content" class="p-3 rounded-lg bg-slate-900/90 border border-slate-800/80 text-xs font-mono text-slate-200 max-h-56 overflow-y-auto whitespace-pre-wrap leading-relaxed">
                     ${escapeHtml(data.masked_text || data.cleaned_text)}
                 </div>
             </div>
 
             ${recs.length > 0 ? `
-            <div class="p-4 rounded-xl bg-slate-950/90 border border-emerald-500/30 space-y-3">
+            <div class="p-4 rounded-xl bg-slate-950/90 border border-emerald-500/20 space-y-3">
                 <div class="flex items-center justify-between border-b border-slate-800 pb-2">
-                    <h3 class="text-xs sm:text-sm font-bold text-emerald-400 flex items-center gap-2"><span>🎯</span> AI Önerilen Aksiyon Listesi (Faz 5)</h3>
+                    <h3 class="text-xs sm:text-sm font-bold text-emerald-400 flex items-center gap-2"><span>🎯</span> Aksiyon ve Tavsiye Listesi</h3>
                     <span class="text-[10px] text-slate-400 font-semibold">${recs.length} Öneri</span>
                 </div>
                 <div class="space-y-2">
@@ -810,16 +871,16 @@ function displayResults(data) {
             </div>
             ` : ''}
 
-            <div class="p-4 sm:p-5 rounded-2xl glass-inner border border-indigo-500/30 shadow-xl space-y-3.5">
+            <!-- 3. Dokümana Soru Sor Bölümü -->
+            <div id="chat-section" class="p-4 sm:p-5 rounded-2xl glass-inner border border-indigo-500/30 shadow-xl space-y-3.5 transition-all">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
                         <span class="text-base sm:text-lg">💬</span>
                         <div>
                             <h3 class="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
-                                Dokümanla Sohbet Et (RAG Q&A)
-                                <span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-semibold border border-indigo-500/30">Groq LLaMA-3.3</span>
+                                Dokümana Soru Sor
                             </h3>
-                            <p class="text-[11px] text-slate-400">Bu dokümanın içeriğine dair her şeyi sorun; yapay zekâ kaynak referanslarıyla yanıtlasın.</p>
+                            <p class="text-[11px] text-slate-400">Bu dokümanın içeriğine dair detayları, tarihleri veya şartları sorun.</p>
                         </div>
                     </div>
                 </div>
@@ -830,13 +891,13 @@ function displayResults(data) {
                     <div class="flex items-start gap-2">
                         <div class="w-7 h-7 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 text-xs shrink-0 mt-0.5">🤖</div>
                         <div class="max-w-[85%] p-3 rounded-2xl chat-bubble-ai text-xs sm:text-sm text-slate-200">
-                            ${isTurkish ? 'Merhaba! Bu dokümanı analiz ettim. İçerikte geçen herhangi bir detay, tarih, kişi veya aksiyon hakkında soru sorabilirsiniz.' : 'Hello! I have analyzed this document. You can ask any specific questions about dates, facts, figures, or action items.'}
+                            ${isTurkish ? 'Merhaba! Bu dokümanı analiz ettim. İçerikte geçen detaylar hakkında soru sorabilirsiniz.' : 'Hello! I have analyzed this document. Feel free to ask any questions about it.'}
                         </div>
                     </div>
                 </div>
 
                 <form id="chat-form" onsubmit="event.preventDefault(); sendChatMessage();" class="flex gap-2">
-                    <input type="text" id="chat-input" placeholder="${isTurkish ? 'Doküman hakkında bir soru sorun (örn. Olay saat kaçta gerçekleşti?)...' : 'Ask a question about this document...'}" class="flex-1 px-3.5 py-2.5 bg-slate-950/90 border border-slate-800 rounded-xl text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition" autocomplete="off">
+                    <input type="text" id="chat-input" placeholder="${isTurkish ? 'Doküman hakkında bir soru sorun...' : 'Ask a question about this document...'}" class="flex-1 px-3.5 py-2.5 bg-slate-950/90 border border-slate-800 rounded-xl text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition" autocomplete="off">
                     <button type="submit" id="chat-send-btn" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white rounded-xl text-xs sm:text-sm font-bold transition shadow-lg shadow-indigo-600/30 flex items-center gap-1.5 shrink-0">
                         <span>Gönder</span>
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
@@ -844,15 +905,16 @@ function displayResults(data) {
                 </form>
             </div>
 
-            <div class="p-3.5 rounded-xl glass-inner border border-emerald-500/30 flex flex-wrap items-center justify-between gap-2 shadow font-sans">
+            <!-- 4. Rapor Dışa Aktar Bölümü -->
+            <div id="export-section" class="p-3.5 rounded-xl glass-inner border border-emerald-500/30 flex flex-wrap items-center justify-between gap-2 shadow font-sans transition-all">
                 <div class="flex items-center gap-2">
                     <span class="text-base">📥</span>
-                    <span class="text-xs font-bold text-emerald-400 uppercase tracking-wider">Raporu Dışa Aktar (Faz 4 Export)</span>
+                    <span class="text-xs font-bold text-emerald-400 uppercase tracking-wider">Raporu İndir</span>
                 </div>
                 <div class="flex items-center gap-1.5">
                     <button type="button" onclick="downloadExport('json')" class="px-2.5 py-1 bg-slate-900 border border-slate-700 hover:border-emerald-500 text-xs font-semibold text-slate-200 rounded-lg transition">JSON</button>
                     <button type="button" onclick="downloadExport('csv')" class="px-2.5 py-1 bg-slate-900 border border-slate-700 hover:border-emerald-500 text-xs font-semibold text-emerald-300 rounded-lg transition">📊 CSV</button>
-                    <button type="button" onclick="downloadExport('html')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white rounded-lg transition shadow">📄 HTML / PDF Rapor</button>
+                    <button type="button" onclick="downloadExport('html')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white rounded-lg transition shadow">📄 HTML Rapor</button>
                 </div>
             </div>
 
@@ -862,6 +924,10 @@ function displayResults(data) {
         </div>
     `;
     resultsDiv.classList.remove('hidden');
+
+    if (autoScrollToMasked) {
+        setTimeout(() => scrollToSection('masked-text-section'), 100);
+    }
 }
 
 function displayBatchResults(data) {
@@ -878,7 +944,7 @@ function displayBatchResults(data) {
     resultsDiv.innerHTML = `
         <div class="p-4 rounded-2xl glass-inner border border-emerald-500/40 shadow-xl space-y-4">
             <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
-                <div><h2 class="text-base font-bold text-emerald-400 flex items-center gap-2">📦 Toplu Doküman Analiz Raporu (Faz 4)</h2><p class="text-xs text-slate-400">Toplam ${data.total_documents} adet doküman işlendi ve birleşik rapor oluşturuldu.</p></div>
+                <div><h2 class="text-base font-bold text-emerald-400 flex items-center gap-2">📦 Toplu Doküman Analiz Raporu</h2><p class="text-xs text-slate-400">Toplam ${data.total_documents} adet doküman işlendi ve birleşik rapor oluşturuldu.</p></div>
                 <div class="flex gap-1.5">
                     <button type="button" onclick="downloadExport('json')" class="px-2.5 py-1 bg-slate-900 border border-slate-700 hover:border-emerald-500 text-xs font-semibold text-slate-200 rounded-lg">JSON</button>
                     <button type="button" onclick="downloadExport('csv')" class="px-2.5 py-1 bg-slate-900 border border-slate-700 hover:border-emerald-500 text-xs font-semibold text-emerald-300 rounded-lg">📊 CSV</button>
@@ -908,7 +974,7 @@ function displayCompareResults(data) {
 
     resultsDiv.innerHTML = `
         <div class="p-4 sm:p-5 rounded-2xl glass-inner border border-indigo-500/40 shadow-xl space-y-4">
-            <div class="border-b border-slate-800 pb-2"><h2 class="text-base font-bold text-indigo-400 flex items-center gap-2">⚖️ Doküman Karşılaştırma & Diff Raporu (Faz 4)</h2><p class="text-xs text-slate-400">İki doküman arasındaki semantik benzerlik, risk değişimi ve içerik farkları aşağıdadır.</p></div>
+            <div class="border-b border-slate-800 pb-2"><h2 class="text-base font-bold text-indigo-400 flex items-center gap-2">⚖️ Doküman Karşılaştırma Raporu</h2><p class="text-xs text-slate-400">İki doküman arasındaki semantik benzerlik, risk değişimi ve içerik farkları aşağıdadır.</p></div>
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div class="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 text-center"><span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">İçerik Benzerliği</span><span class="text-2xl font-black ${simColor}">%${data.similarity_percentage}</span></div>
                 <div class="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 text-center"><span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Risk Skoru Değişimi</span><span class="text-xs font-bold text-slate-200 block mt-1">${data.doc1_risk_score} ➔ ${data.doc2_risk_score}</span><span class="text-[11px] font-semibold text-amber-300 block mt-0.5">${escapeHtml(data.risk_status)}</span></div>
