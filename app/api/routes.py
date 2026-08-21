@@ -24,6 +24,12 @@ from app.services.llm_service import translate_text
 from app.services.rag_service import generate_rag_answer
 from app.services.ner_service import mask_pii_text
 
+from app.services.anomaly_service import detect_document_anomalies
+from app.services.recommendation_service import generate_action_recommendations
+from app.services.metrics_service import record_analysis_metrics, get_system_metrics
+from app.services.webhook_service import dispatch_webhook_event
+from app.models.schemas import WebhookTestRequest, SystemMetricsResponse
+
 router = APIRouter()
 
 SUPPORTED_IMAGE_EXTENSIONS = {
@@ -90,6 +96,25 @@ def process_text_pipeline(
             breakdown=kvkk_dict["breakdown"]
         )
 
+        # Faz 5: Anomali & Sahtecilik Tespiti
+        anomaly_rep = detect_document_anomalies(cleaned_text, category=category)
+
+        # Faz 5: Otomatik Aksiyon Önerileri Motoru
+        recs = generate_action_recommendations(
+            category=category,
+            risk_level=risk_data["risk_level"],
+            risk_score=risk_data["risk_score"],
+            kvkk_report=kvkk_rep,
+            anomaly_report=anomaly_rep
+        )
+
+        # Faz 5: Canlı Sistem Metriklerini Güncelle
+        record_analysis_metrics(
+            category=category,
+            risk_score=risk_data["risk_score"],
+            pii_count=kvkk_dict["total_entities"]
+        )
+
         return AnalysisResponse(
             summary=summary,
             keywords=keywords,
@@ -103,10 +128,13 @@ def process_text_pipeline(
             cleaned_text=cleaned_text,
             entities=pii_entities,
             masked_text=masked_txt,
-            kvkk_report=kvkk_rep
+            kvkk_report=kvkk_rep,
+            anomaly_report=anomaly_rep,
+            recommendations=recs
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analiz sırasında bir sunucu hatası oluştu: {str(e)}")
+
 
 @router.post("/analyze-text", response_model=AnalysisResponse)
 def analyze_text(request: TextAnalysisRequest):
@@ -256,3 +284,136 @@ def mask_pii_endpoint(request: MaskRequest):
         entities=pii_entities,
         kvkk_report=kvkk_rep
     )
+
+# --- FAZ 4 ENDPOINT'LERİ (Toplu Analiz, Doküman Karşılaştırma & Export) ---
+
+from typing import List as ListType
+from fastapi import Response
+from app.models.schemas import (
+    BatchAnalysisResponse,
+    DocumentCompareRequest,
+    DocumentCompareResponse,
+    ExportRequest
+)
+from app.services.batch_service import aggregate_batch_results
+from app.services.compare_service import compare_two_documents
+from app.services.export_service import generate_json_bytes, generate_csv_bytes, generate_html_report
+
+@router.post("/analyze-batch", response_model=BatchAnalysisResponse)
+async def analyze_batch_files(files: ListType[UploadFile] = File(...)):
+    """
+    Birden fazla dosyayı (PDF, Görsel, TXT) eşzamanlı olarak işler ve toplu analiz raporu döndürür.
+    """
+    if not files or len(files) == 0:
+        raise HTTPException(status_code=400, detail="En az 1 adet dosya yüklenmelidir.")
+        
+    processed_items = []
+    
+    for file in files:
+        filename = file.filename or "unknown_file"
+        lower_name = filename.lower()
+        
+        try:
+            file_bytes = await file.read()
+            if len(file_bytes) == 0:
+                continue
+                
+            if lower_name.endswith('.pdf'):
+                raw_text, method, page_count = extract_text_from_pdf(file_bytes, return_metadata=True)
+            elif any(lower_name.endswith(ext) for ext in SUPPORTED_IMAGE_EXTENSIONS):
+                ext = next(e for e in SUPPORTED_IMAGE_EXTENSIONS if lower_name.endswith(e))
+                mime_type = SUPPORTED_IMAGE_EXTENSIONS[ext]
+                raw_text, method = extract_text_from_image_bytes(file_bytes, mime_type=mime_type)
+                page_count = 1
+            else:
+                # Düz metin / TXT dosyası kabul edilir
+                raw_text = file_bytes.decode('utf-8', errors='ignore')
+                method = "text"
+                page_count = 1
+                
+            if raw_text and raw_text.strip():
+                resp = process_text_pipeline(
+                    raw_text,
+                    extraction_method=method,
+                    page_count=page_count
+                )
+                processed_items.append((filename, resp))
+        except Exception as e:
+            # Hatalı dosyalar atlanır veya genel havuza eklenmez
+            continue
+            
+    if not processed_items:
+        raise HTTPException(
+            status_code=400,
+            detail="Yüklenen dosyaların hiçbirinden okunabilir metin çıkarılamadı."
+        )
+
+    return aggregate_batch_results(processed_items)
+
+@router.post("/compare-documents", response_model=DocumentCompareResponse)
+def compare_documents_endpoint(request: DocumentCompareRequest):
+    """
+    İki dokümanı karşılaştırarak benzerlik skorunu, risk değişimini ve PII farkını çıkarır.
+    """
+    if not request.doc1_text or not request.doc1_text.strip():
+        raise HTTPException(status_code=400, detail="1. Doküman metni boş olamaz.")
+    if not request.doc2_text or not request.doc2_text.strip():
+        raise HTTPException(status_code=400, detail="2. Doküman metni boş olamaz.")
+        
+    return compare_two_documents(
+        doc1_text=request.doc1_text,
+        doc2_text=request.doc2_text,
+        doc1_title=request.doc1_title or "Doküman 1",
+        doc2_title=request.doc2_title or "Doküman 2",
+        language=request.language
+    )
+
+@router.post("/export/json")
+def export_json_endpoint(request: ExportRequest):
+    """Analiz sonuçlarını indirilebilir JSON olarak verir."""
+    json_bytes = generate_json_bytes(request.analysis_data)
+    return Response(
+        content=json_bytes,
+        media_type="application/json",
+        headers={"Content-Disposition": "attachment; filename=doc_analysis_report.json"}
+    )
+
+@router.post("/export/csv")
+def export_csv_endpoint(request: ExportRequest):
+    """Analiz sonuçlarını indirilebilir CSV e-tablo dosyası olarak verir."""
+    csv_bytes = generate_csv_bytes(request.analysis_data)
+    return Response(
+        content=csv_bytes,
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=doc_analysis_report.csv"}
+    )
+
+@router.post("/export/html")
+def export_html_endpoint(request: ExportRequest):
+    """Analiz sonuçlarını baskıya uygun (PDF-ready) HTML raporu olarak verir."""
+    html_content = generate_html_report(request.analysis_data)
+    return Response(
+        content=html_content.encode('utf-8'),
+        media_type="text/html",
+        headers={"Content-Disposition": "attachment; filename=doc_analysis_report.html"}
+    )
+
+# --- FAZ 5 ENDPOINT'LERİ (Anomali, Akıllı Aksiyon Motoru, Metrikler & Webhook) ---
+
+@router.get("/metrics", response_model=SystemMetricsResponse)
+@router.get("/analytics", response_model=SystemMetricsResponse)
+def get_metrics_endpoint():
+    """Sistem geneli işleme istatistiklerini ve canlı metrikleri döndürür."""
+    return get_system_metrics()
+
+@router.post("/webhooks/test")
+async def test_webhook_endpoint(request: WebhookTestRequest):
+    """Belirtilen Webhook URL adresine canlı test bildirimi gönderir."""
+    sample_payload = {
+        "event": request.event_type or "risk.critical",
+        "sample_document": "Güvenlik Test Dokümanı",
+        "risk_score": 85,
+        "message": "Dokümanda kritik risk uyarısı tespit edilmiştir."
+    }
+    res = await dispatch_webhook_event(request.webhook_url, request.event_type or "risk.critical", sample_payload)
+    return res

@@ -19,6 +19,18 @@ class KVKKReport(BaseModel):
     total_entities: int
     breakdown: Dict[str, int]
 
+class AnomalyReport(BaseModel):
+    has_anomaly: bool
+    anomaly_score: int
+    anomaly_flags: List[str]
+    details: str
+
+class ActionItem(BaseModel):
+    priority: str  # "High", "Medium", "Low"
+    category: str  # "Security", "Compliance", "Legal", "Operational"
+    title: str
+    description: str
+
 class AnalysisResponse(BaseModel):
     summary: str
     keywords: List[str]
@@ -33,6 +45,9 @@ class AnalysisResponse(BaseModel):
     entities: Optional[List[PIIEntity]] = []
     masked_text: Optional[str] = None
     kvkk_report: Optional[KVKKReport] = None
+    anomaly_report: Optional[AnomalyReport] = None
+    recommendations: Optional[List[ActionItem]] = []
+
 
 class TranslationRequest(BaseModel):
     text: str
@@ -69,3 +84,57 @@ class MaskResponse(BaseModel):
     masked_text: str
     entities: List[PIIEntity]
     kvkk_report: KVKKReport
+
+# --- FAZ 4 MODELLERİ (Toplu Analiz, Doküman Karşılaştırma & Export) ---
+
+class BatchAnalysisItem(BaseModel):
+    filename: str
+    extraction_method: str = "text"
+    page_count: Optional[int] = None
+    analysis: AnalysisResponse
+
+class BatchAnalysisResponse(BaseModel):
+    total_documents: int
+    overall_summary: str
+    global_risk_level: str
+    global_risk_score: int
+    global_kvkk_report: KVKKReport
+    documents: List[BatchAnalysisItem]
+
+class DocumentCompareRequest(BaseModel):
+    doc1_text: str
+    doc2_text: str
+    doc1_title: Optional[str] = "Doküman 1"
+    doc2_title: Optional[str] = "Doküman 2"
+    language: Optional[str] = None
+
+class DocumentCompareResponse(BaseModel):
+    similarity_score: float
+    similarity_percentage: int
+    risk_delta: int
+    risk_status: str
+    added_keypoints: List[str]
+    removed_keypoints: List[str]
+    doc1_category: str
+    doc2_category: str
+    doc1_risk_score: int
+    doc2_risk_score: int
+    pii_diff_count: int
+    summary_comparison: str
+
+class ExportRequest(BaseModel):
+    analysis_data: Dict[str, Any]
+    export_format: Optional[str] = "json"  # "json", "csv", "html"
+
+# --- FAZ 5 MODELLERİ (Anomali, Tavsiye Motoru, Webhook & Metrikler) ---
+
+class WebhookTestRequest(BaseModel):
+    webhook_url: str
+    event_type: Optional[str] = "risk.critical"
+
+class SystemMetricsResponse(BaseModel):
+    total_processed: int
+    total_pii_masked: int
+    avg_risk_score: float
+    category_breakdown: Dict[str, int]
+    system_status: str
