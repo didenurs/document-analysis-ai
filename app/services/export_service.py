@@ -1,7 +1,133 @@
 import json
 import csv
 import io
+import pymupdf
 from typing import Dict, Any
+
+def generate_pdf_report(data: Dict[str, Any]) -> bytes:
+    """
+    Analiz verilerini ve maskelenmiş doküman metnini içeren,
+    baskıya ve indirmeye hazır PDF raporu üretir.
+    """
+    doc = pymupdf.open()
+    page_width, page_height = 595, 842  # A4 boyutları (72 dpi)
+    margin = 40
+    usable_width = page_width - (margin * 2)
+
+    page = doc.new_page(width=page_width, height=page_height)
+    y = margin
+
+    def check_page_space(required_height: float):
+        nonlocal page, y
+        if y + required_height > page_height - margin:
+            page = doc.new_page(width=page_width, height=page_height)
+            y = margin
+
+    # 1. BAŞLIK VE LOGO BÖLÜMÜ
+    title = "Toplu Doküman Analiz Raporu" if "documents" in data else "Doküman Analiz & Risk Raporu"
+    
+    # Başlık arka plan şeridi
+    page.draw_rect(pymupdf.Rect(margin, y, margin + usable_width, y + 45), color=(0.06, 0.09, 0.16), fill=(0.06, 0.09, 0.16))
+    page.insert_text((margin + 12, y + 28), f"Doc Analysis AI - {title}", fontsize=15, color=(0.22, 0.74, 0.97))
+    y += 55
+
+    is_batch = "documents" in data
+
+    if not is_batch:
+        summary = data.get("summary", "")
+        category = data.get("category", "Genel")
+        risk_level = data.get("risk_level", "Low")
+        risk_score = data.get("risk_score", 0)
+        language_label = data.get("language_label", "Türkçe")
+        extraction_method = data.get("extraction_method", "Metin")
+        keywords = data.get("keywords", [])
+        kvkk = data.get("kvkk_report", {})
+        masked_text = data.get("masked_text") or data.get("cleaned_text", "")
+
+        # 2. METRİK VAZİYET KUTUSU (Risk & KVKK)
+        check_page_space(70)
+        box_rect = pymupdf.Rect(margin, y, margin + usable_width, y + 65)
+        page.draw_rect(box_rect, color=(0.2, 0.25, 0.33), fill=(0.95, 0.97, 1.0))
+        
+        info_str = (
+            f"Kategori: {category}   |   Dil: {language_label}   |   Yöntem: {extraction_method}\n"
+            f"Güvenlik Riski: {risk_level} (Skor: {risk_score}/100)\n"
+            f"KVKK Durumu: {kvkk.get('status', 'GÜVENLİ')} (Tespit Edilen PII: {kvkk.get('total_entities', 0)} varlık)"
+        )
+        page.insert_textbox(pymupdf.Rect(margin + 12, y + 10, margin + usable_width - 12, y + 60), info_str, fontsize=10, color=(0.1, 0.15, 0.25))
+        y += 75
+
+        # 3. YAPAY ZEKÂ ÖZETİ
+        check_page_space(80)
+        page.insert_text((margin, y), "✨ Yapay Zekâ Doküman Özeti", fontsize=12, color=(0.02, 0.52, 0.78))
+        y += 15
+        
+        summary_rect = pymupdf.Rect(margin, y, margin + usable_width, y + 120)
+        written_rc = page.insert_textbox(summary_rect, summary, fontsize=9.5, color=(0.15, 0.2, 0.25))
+        y += max(50, 130 - max(0, written_rc))
+
+        # 4. ANAHTAR KELİMELER
+        if keywords:
+            check_page_space(35)
+            kw_str = "Anahtar Kelimeler: " + ", ".join([f"#{k}" for k in keywords])
+            page.insert_textbox(pymupdf.Rect(margin, y, margin + usable_width, y + 30), kw_str, fontsize=9, color=(0.3, 0.35, 0.45))
+            y += 35
+
+        # 5. MASKELEMENMİŞ DOKÜMAN METNİ
+        if masked_text:
+            check_page_space(100)
+            page.insert_text((margin, y), "🔒 Kişisel Verileri Maskelenmiş Doküman Metni (PII Maskeli)", fontsize=11, color=(0.06, 0.6, 0.4))
+            y += 18
+
+            lines = masked_text.splitlines()
+            current_chunk = []
+            for line in lines:
+                current_chunk.append(line)
+                chunk_text = "\n".join(current_chunk)
+                if len(chunk_text) > 1200:
+                    check_page_space(200)
+                    t_box = pymupdf.Rect(margin, y, margin + usable_width, y + (page_height - margin - y - 20))
+                    page.draw_rect(t_box, color=(0.8, 0.85, 0.9), fill=(0.97, 0.98, 1.0))
+                    page.insert_textbox(t_box, chunk_text, fontsize=8.5, color=(0.1, 0.1, 0.15))
+                    page = doc.new_page(width=page_width, height=page_height)
+                    y = margin
+                    current_chunk = []
+
+            if current_chunk:
+                chunk_text = "\n".join(current_chunk)
+                box_h = min(400, max(60, len(chunk_text) // 3 + 30))
+                check_page_space(box_h)
+                t_box = pymupdf.Rect(margin, y, margin + usable_width, y + box_h)
+                page.draw_rect(t_box, color=(0.8, 0.85, 0.9), fill=(0.97, 0.98, 1.0))
+                page.insert_textbox(t_box, chunk_text, fontsize=8.5, color=(0.1, 0.15, 0.2))
+                y += box_h + 20
+
+    else:
+        # Toplu Rapor
+        overall_summary = data.get("overall_summary", "")
+        total_docs = data.get("total_documents", 0)
+        global_risk = data.get("global_risk_level", "Low")
+        global_score = data.get("global_risk_score", 0)
+
+        info_str = (
+            f"İşlenen Doküman Sayısı: {total_docs} adet\n"
+            f"Genel Güvenlik Riski: {global_risk} (Skor: {global_score}/100)"
+        )
+        page.insert_textbox(pymupdf.Rect(margin, y, margin + usable_width, y + 40), info_str, fontsize=10, color=(0.1, 0.15, 0.25))
+        y += 50
+
+        page.insert_text((margin, y), "✨ Genel Birleşik Özet", fontsize=12, color=(0.02, 0.52, 0.78))
+        y += 15
+        written_rc = page.insert_textbox(pymupdf.Rect(margin, y, margin + usable_width, y + 150), overall_summary, fontsize=9.5, color=(0.15, 0.2, 0.25))
+        y += 160
+
+    # DİPNOT
+    for p in doc:
+        p.insert_text((margin, page_height - 25), "Doc Analysis AI - Otomatik Oluşturulan PDF Analiz & KVKK Raporudur.", fontsize=8, color=(0.5, 0.5, 0.5))
+
+    return doc.tobytes()
+
+
 
 def generate_json_bytes(data: Dict[str, Any]) -> bytes:
     """Analiz verilerini yapılandırılmış JSON baytlarına dönüştürür."""

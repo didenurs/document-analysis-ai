@@ -398,6 +398,16 @@ def export_html_endpoint(request: ExportRequest):
         headers={"Content-Disposition": "attachment; filename=doc_analysis_report.html"}
     )
 
+@router.post("/export/pdf")
+def export_pdf_endpoint(request: ExportRequest):
+    """Analiz sonuçlarını ve maskelenmiş metni doğrudan .PDF belgesi olarak indirilebilir kılar."""
+    pdf_bytes = generate_pdf_report(request.analysis_data)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=doc_analysis_report.pdf"}
+    )
+
 # --- FAZ 5 ENDPOINT'LERİ (Anomali, Akıllı Aksiyon Motoru, Metrikler & Webhook) ---
 
 @router.get("/metrics", response_model=SystemMetricsResponse)
