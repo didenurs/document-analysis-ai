@@ -116,28 +116,34 @@ def smart_fallback_answer(text: str, question: str, language: str = "tr") -> Dic
         unique_dates = list(dict.fromkeys(dates))
         
         if unique_dates:
-            lines = text.split('\n')
             matched_details = []
+            sources_list = []
             for d in unique_dates:
-                for line in lines:
-                    if d in line and line.strip() not in matched_details:
-                        matched_details.append(line.strip())
-                        break
+                pos = text.find(d)
+                if pos != -1:
+                    start = max(0, pos - 30)
+                    end = min(len(text), pos + len(d) + 30)
+                    snippet = text[start:end].replace('\n', ' ').strip()
+                    snippet_clean = re.sub(r'\s+', ' ', snippet)
+                    entry = f"{d} (İçerik: \"...{snippet_clean}...\")"
+                    matched_details.append(entry)
+                    sources_list.append(snippet_clean)
             
             if language == "tr":
                 ans = "Dokümanda tespit edilen tarih, dönem ve zaman bilgileri:\n\n"
-                for item in matched_details[:8]:
+                for item in matched_details[:10]:
                     ans += f"• {item}\n"
             else:
                 ans = "Dates, academic terms, and timelines found in the document:\n\n"
-                for item in matched_details[:8]:
+                for item in matched_details[:10]:
                     ans += f"• {item}\n"
             
             return {
                 "answer": ans.strip(),
-                "sources": matched_details[:3],
+                "sources": sources_list[:3],
                 "confidence": 0.85
             }
+
 
     # 2. Genel Cümle / Kelime Eşleştirme
     words = [w for w in re.findall(r'\w+', q_lower) if len(w) > 3 and w not in MULTILINGUAL_STOPWORDS]
