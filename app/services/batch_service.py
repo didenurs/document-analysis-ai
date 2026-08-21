@@ -1,7 +1,66 @@
+import os
+import httpx
 from typing import List, Dict, Any, Tuple
 from app.models.schemas import BatchAnalysisItem, BatchAnalysisResponse, KVKKReport, AnalysisResponse
 from app.services.summary_service import generate_summary
+from app.services.llm_service import is_llm_available, GROQ_API_URL
 from app.utils.language_detector import detect_language
+
+def _generate_batch_executive_summary(
+    processed_items: List[Tuple[str, AnalysisResponse]],
+    dominant_lang: str = "tr"
+) -> str:
+    """Toplu analiz edilen tüm dokümanlar için 2-3 cümlelik temiz birleşik özet üretir."""
+    if not processed_items:
+        return "Toplu doküman analizi tamamlandı."
+
+    filenames = [fname for fname, _ in processed_items]
+    categories = sorted(list({resp.category for _, resp in processed_items if resp.category}))
+    doc_summaries = [f"- {fname}: {resp.summary}" for fname, resp in processed_items if resp.summary]
+
+    # 1. Groq LLM Sentezleyici
+    if is_llm_available() and doc_summaries:
+        api_key = os.getenv("GROQ_API_KEY", "").strip()
+        selected_model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+        lang_name = "Türkçe" if dominant_lang == "tr" else "English"
+        
+        system_prompt = (
+            f"You are an executive AI report synthesizer. "
+            f"Synthesize a brief, high-level 2-3 sentence overall summary in {lang_name} for a batch of {len(processed_items)} documents. "
+            f"Describe the main topics and document categories analyzed as a unified whole. "
+            f"Do NOT list document filenames or copy raw bullets line-by-line. Output ONLY the clean 2-3 sentence executive summary in {lang_name}."
+        )
+        
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        payload = {
+            "model": selected_model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": "Individual document summaries:\n" + "\n".join(doc_summaries[:5])}
+            ],
+            "temperature": 0.2,
+            "max_tokens": 250
+        }
+        try:
+            with httpx.Client(timeout=8.0) as client:
+                res = client.post(GROQ_API_URL, headers=headers, json=payload)
+                if res.status_code == 200:
+                    summary = res.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                    if summary:
+                        return summary.strip('"').strip("'").strip()
+        except Exception:
+            pass
+
+    # 2. Akıllı Yerel Fallback Sentezleyici
+    cats_str = ", ".join(categories) if categories else ("Genel" if dominant_lang == "tr" else "General")
+    files_str = ", ".join(filenames[:3])
+    if len(filenames) > 3:
+        files_str += f" (+{len(filenames)-3} dosya)"
+
+    if dominant_lang == "tr":
+        return f"Toplu analiz kapsamında {len(processed_items)} adet doküman ({cats_str} kategorilerinde) başarıyla incelenmiştir. İncelenen dosyalar ({files_str}) genel içerik, güvenlik durumu ve veri gizliliği standartları açısından değerlendirilmiştir."
+    else:
+        return f"A total of {len(processed_items)} documents across categories ({cats_str}) were successfully analyzed ({files_str}) for content, security risk, and data privacy."
 
 def aggregate_batch_results(
     processed_items: List[Tuple[str, AnalysisResponse]]
@@ -27,7 +86,6 @@ def aggregate_batch_results(
         )
 
     batch_docs: List[BatchAnalysisItem] = []
-    combined_summaries: List[str] = []
     max_risk_score = 0
     total_pii_count = 0
     global_breakdown: Dict[str, int] = {}
@@ -42,9 +100,6 @@ def aggregate_batch_results(
                 analysis=resp
             )
         )
-
-        if resp.summary:
-            combined_summaries.append(f"[{filename}]: {resp.summary}")
 
         if resp.risk_score > max_risk_score:
             max_risk_score = resp.risk_score
@@ -85,13 +140,7 @@ def aggregate_batch_results(
 
     # Genel Birleşik Özet Üretimi
     dominant_lang = "tr" if detected_langs.count("tr") >= len(detected_langs) / 2 else "en"
-    if combined_summaries:
-        corpus_for_summary = "\n\n".join(combined_summaries)
-        if len(corpus_for_summary) > 2000:
-            corpus_for_summary = corpus_for_summary[:2000] + "..."
-        overall_summary = generate_summary(corpus_for_summary, language=dominant_lang)
-    else:
-        overall_summary = "Toplu doküman analizi tamamlandı."
+    overall_summary = _generate_batch_executive_summary(processed_items, dominant_lang=dominant_lang)
 
     return BatchAnalysisResponse(
         total_documents=len(batch_docs),

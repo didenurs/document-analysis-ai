@@ -33,12 +33,12 @@ def generate_llm_summary(text: str, language: str = "en", model: Optional[str] =
         f"You are an expert, highly precise AI document summarizer. "
         f"Your task is to write a concise, professional, and completely original abstractive summary in {lang_name}. "
         f"CRITICAL INSTRUCTIONS:\n"
-        f"1. Do NOT copy sentences verbatim from the input text.\n"
-        f"2. Synthesize the core message, key findings, literary themes, or critical takeaways using fresh, fluent, and coherent wording.\n"
-        f"3. For longer documents or articles, provide a comprehensive 3-5 sentence structured executive summary.\n"
-        f"4. ALWAYS ensure the summary is completely finished and ends strictly with a full stop or appropriate punctuation. Never stop mid-sentence.\n"
-        f"5. PRIVACY & PII RULE: If the input text contains masked data or privacy placeholders (e.g. 100*****46, 0532 *** ** 67, [TCKN], a***@domain.com), NEVER attempt to reveal or invent private personal data. Keep them masked or describe them abstractly.\n"
-        f"6. Output ONLY the summary text in {lang_name}, without meta-comments, introductory phrases, or markdown headers."
+        f"1. Do NOT copy sentences or tables verbatim from the input text.\n"
+        f"2. Synthesize the core message, main purpose, or key takeaways in 2 to 3 concise sentences (maximum 60-80 words).\n"
+        f"3. STRUCTURED DATA & TRANSCRIPTS: For transcripts, grade reports, invoices, logs, or tabular data, NEVER list raw course names, credits, or line items. Describe what the document is, who it belongs to (if applicable), and its key outcome (e.g. 'Student academic transcript showing completed engineering courses and a CGPA of 2.33.').\n"
+        f"4. ALWAYS ensure the summary is completely finished and ends strictly with a full stop.\n"
+        f"5. PRIVACY & PII RULE: If the input text contains masked data or privacy placeholders, keep them masked or describe them abstractly.\n"
+        f"6. Output ONLY the clean summary text in {lang_name}, without meta-comments, introductory phrases (like 'Özet:' or 'Summary:'), markdown headers, or quotes."
     )
 
     

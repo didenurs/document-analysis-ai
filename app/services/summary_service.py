@@ -41,11 +41,18 @@ def _clean_headers_and_fillers(text: str) -> str:
         cleaned = cleaned[0].upper() + cleaned[1:]
     return cleaned
 
+def _clean_summary_prefix(text: str) -> str:
+    """Metnin başındaki Özet:, Summary: gibi tekrarlayan takıları temizler."""
+    cleaned = text.strip()
+    cleaned = re.sub(r'^(?:Özet(?:\s*\([^)]*\))?:\s*|Summary(?:\s*\([^)]*\))?:\s*|\[.*?\]:\s*)+', '', cleaned, flags=re.IGNORECASE).strip()
+    if cleaned and cleaned[0].islower():
+        cleaned = cleaned[0].upper() + cleaned[1:]
+    return cleaned
+
 def _condense_short_fallback(sentences: list, cleaned_text: str, lang: str = "en") -> str:
     """
-    1-2 cümlelik metinler için yerel akıllı sentezleyici ve yan tümce damıtıcısı.
+    1-2 cümlelik veya yapılandırılmış metinler için yerel akıllı sentezleyici.
     """
-    # 1. Tek Cümle
     if len(sentences) <= 1:
         s = _clean_headers_and_fillers(sentences[0] if sentences else cleaned_text)
         
@@ -55,7 +62,7 @@ def _condense_short_fallback(sentences: list, cleaned_text: str, lang: str = "en
         
         if len(sub_clauses) > 1:
             scored = []
-            for idx, c in enumerate(sub_clauses):
+            for c in sub_clauses:
                 words = re.findall(r'\b[a-zA-ZçğıöşüÇĞİÖŞÜ]{3,}\b', c.lower())
                 meaningful = [w for w in words if w not in STOP_WORDS_MULTILINGUAL]
                 score = len(meaningful) / (len(words) if words else 1)
@@ -64,15 +71,12 @@ def _condense_short_fallback(sentences: list, cleaned_text: str, lang: str = "en
             best = scored[0][1]
             if not best.endswith(('.', '!', '?')):
                 best += '.'
-            prefix = "Özet (Önemli Vurgu): " if lang == "tr" else "Summary (Key Highlight): "
-            return f"{prefix}{best}"
+            return _clean_summary_prefix(best)
             
-        prefix = "Özet: " if lang == "tr" else "Summary: "
         if not s.endswith(('.', '!', '?')):
             s += '.'
-        return f"{prefix}{s}"
+        return _clean_summary_prefix(s)
 
-    # 2. İki Cümle: En kritik cümleyi seçip başlıkları arındırarak tek bir öz cümleye indir
     s1 = _clean_headers_and_fillers(sentences[0])
     s2 = _clean_headers_and_fillers(sentences[1])
     
@@ -84,13 +88,12 @@ def _condense_short_fallback(sentences: list, cleaned_text: str, lang: str = "en
     else:
         chosen = s2 if s2.endswith(('.', '!', '?')) else f"{s2}."
         
-    prefix = "Özet: " if lang == "tr" else "Summary: "
-    return f"{prefix}{chosen}"
+    return _clean_summary_prefix(chosen)
 
-def generate_summary(text: str, max_sentences: int = 3, language: Optional[str] = None) -> str:
+def generate_summary(text: str, max_sentences: int = 2, language: Optional[str] = None) -> str:
     """
     Hibrit Özetleyici:
-    1. Birincil Tercih: Groq LPU (LLaMA-3.3) ile tamamen baştan yazılan özgün soyutlayıcı (abstractive) özet.
+    1. Birincil Tercih: Groq LPU (LLaMA-3.3) ile özgün ve öz soyutlayıcı özet (max 300 char).
     2. Yedek Plan (Fallback): Sıfır gecikmeli, başlık filtrelemeli ve dinamik sıkıştırmalı yerel sentezleyici.
     """
     cleaned_text = text.strip()
@@ -102,27 +105,30 @@ def generate_summary(text: str, max_sentences: int = 3, language: Optional[str] 
     # 1. Groq LLM API ile Özetleme Denemesi (Varsa ve Aktifse)
     llm_result = generate_llm_summary(cleaned_text, language=lang)
     if llm_result:
-        return llm_result
+        return _clean_summary_prefix(llm_result)
         
     # 2. Yerel Akıllı Sentezleyici (Fallback Engine)
     raw_sentences = re.split(r'(?<=[.!?])\s+|\n+', cleaned_text)
     sentences = [s.strip() for s in raw_sentences if len(s.strip()) > 5]
     
-    # Kısa Metinler (<= 2 cümle)
+    # Kısa veya Tek Cümleli Metinler
     if len(sentences) <= 2:
-        return _condense_short_fallback(sentences, cleaned_text, lang=lang)
+        res = _condense_short_fallback(sentences, cleaned_text, lang=lang)
+        if len(res) > 350:
+            res = res[:347] + "..."
+        return _clean_summary_prefix(res)
         
-    # 3 Cümlelik Metinler İçin Dinamik Sıkıştırma (En kritik 1-2 cümleyi seç)
-    target_sentences = 2 if len(sentences) == 3 else min(max_sentences, max(1, len(sentences) // 2))
-    
-    # Çok Cümleli Metinler İçin TF ve Pozisyonel Sıralama
+    # TF ve Pozisyonel Sıralama ile Cümle Seçimi
     words = re.findall(r'\b[a-zA-ZçğıöşüÇĞİÖŞÜ]{3,}\b', cleaned_text.lower())
     filtered_words = [w for w in words if w not in STOP_WORDS_MULTILINGUAL]
     word_freq = Counter(filtered_words)
     
     if not word_freq:
-        cleaned_sents = [_clean_headers_and_fillers(s) for s in sentences[:target_sentences]]
-        return " ".join(s if s.endswith(('.', '!', '?')) else f"{s}." for s in cleaned_sents)
+        cleaned_sents = [_clean_headers_and_fillers(s) for s in sentences[:max_sentences]]
+        res = " ".join(s if s.endswith(('.', '!', '?')) else f"{s}." for s in cleaned_sents)
+        if len(res) > 350:
+            res = res[:347] + "..."
+        return _clean_summary_prefix(res)
         
     max_freq = max(word_freq.values())
     normalized_freq = {w: count / max_freq for w, count in word_freq.items()}
@@ -142,12 +148,15 @@ def generate_summary(text: str, max_sentences: int = 3, language: Optional[str] 
         scored_sentences.append((final_score, idx, cleaned_sent))
     
     if not scored_sentences:
-        cleaned_sents = [_clean_headers_and_fillers(s) for s in sentences[:target_sentences]]
-        return " ".join(cleaned_sents)
-        
-    scored_sentences.sort(key=lambda x: x[0], reverse=True)
-    top_sentences = scored_sentences[:target_sentences]
-    top_sentences.sort(key=lambda x: x[1])
+        cleaned_sents = [_clean_headers_and_fillers(s) for s in sentences[:max_sentences]]
+        res = " ".join(cleaned_sents)
+    else:
+        scored_sentences.sort(key=lambda x: x[0], reverse=True)
+        top_sentences = scored_sentences[:max_sentences]
+        top_sentences.sort(key=lambda x: x[1])
+        res = " ".join(s[2] if s[2].endswith(('.', '!', '?')) else f"{s[2]}." for s in top_sentences)
     
-    result = " ".join(s[2] if s[2].endswith(('.', '!', '?')) else f"{s[2]}." for s in top_sentences)
-    return result
+    if len(res) > 350:
+        res = res[:347] + "..."
+        
+    return _clean_summary_prefix(res)
