@@ -106,6 +106,14 @@ def generate_html_report(data: Dict[str, Any]) -> str:
         
         keywords_html = "".join([f"<span class='tag'>#{kw}</span>" for kw in data.get('keywords', [])])
         
+        masked_doc = data.get('masked_text') or data.get('cleaned_text', '')
+        masked_box_html = f"""
+        <div class='box'>
+            <div class='box-title'>🔒 Kişisel Verileri Maskelenmiş Doküman Metni (KVKK / PII Redacted)</div>
+            <div style='background-color: #020617; padding: 16px; border-radius: 8px; font-family: Consolas, Monaco, monospace; font-size: 12px; white-space: pre-wrap; word-break: break-word; color: #e2e8f0; border: 1px solid #1e293b; max-height: 500px; overflow-y: auto;'>{masked_doc}</div>
+        </div>
+        """ if masked_doc else ""
+
         extra_content = f"""
         <div class='box'>
             <div class='box-title'>📁 Kategori & Metadata</div>
@@ -117,6 +125,7 @@ def generate_html_report(data: Dict[str, Any]) -> str:
             <div class='box-title'>🔑 Anahtar İfadeler</div>
             <div>{keywords_html or 'Yok'}</div>
         </div>
+        {masked_box_html}
         """
 
     risk_badge_class = f"risk-{risk_level.lower()}"
@@ -209,10 +218,26 @@ def generate_html_report(data: Dict[str, Any]) -> str:
             color: #94a3b8;
             background-color: #1e293b;
         }}
+        .print-btn {{
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 13px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s;
+        }}
+        .print-btn:hover {{
+            background: #059669;
+        }}
         @media print {{
+            .no-print {{ display: none !important; }}
             body {{ background-color: #fff; color: #000; padding: 0; }}
-            .container {{ background-color: #fff; border: none; box-shadow: none; }}
-            .box {{ background-color: #f8fafc; border: 1px solid #cbd5e1; color: #000; }}
+            .container {{ background-color: #fff; border: none; box-shadow: none; max-width: 100%; }}
+            .box {{ background-color: #f8fafc; border: 1px solid #cbd5e1; color: #000; page-break-inside: avoid; }}
             .box-title {{ color: #475569; }}
             h1 {{ color: #0284c7; }}
             th {{ background-color: #f1f5f9; color: #334155; }}
@@ -222,10 +247,13 @@ def generate_html_report(data: Dict[str, Any]) -> str:
 </head>
 <body>
     <div class="container">
+        <div class="no-print" style="text-align: right; margin-bottom: 16px;">
+            <button onclick="window.print()" class="print-btn">🖨️ PDF Olarak Kaydet / Yazdır</button>
+        </div>
         <div class="header">
             <div>
                 <h1>🤖 Doc Analysis AI - {title}</h1>
-                <p style="color: #94a3b8; font-size: 12px; margin-top: 4px;">Oluşturulma Tarihi: Raporlama Motoru (Faz 4)</p>
+                <p style="color: #94a3b8; font-size: 12px; margin-top: 4px;">Oluşturulma Tarihi: Raporlama Motoru</p>
             </div>
             <div>
                 <span class="badge {risk_badge_class}">Güvenlik Riski: {risk_level} ({risk_score}/100)</span>
@@ -243,7 +271,7 @@ def generate_html_report(data: Dict[str, Any]) -> str:
         {extra_content}
         
         <div style="text-align: center; margin-top: 30px; font-size: 11px; color: #64748b;">
-            Doc Analysis AI - Otomatik Oluşturulan Faz 4 Analiz Raporudur.
+            Doc Analysis AI - Otomatik Oluşturulan Analiz & KVKK Raporudur.
         </div>
     </div>
 </body>
