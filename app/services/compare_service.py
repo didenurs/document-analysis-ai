@@ -74,7 +74,7 @@ def compare_two_documents(
     if risk_delta > 0:
         risk_status = f"Risk Yükseldi (+%{risk_delta})"
     elif risk_delta < 0:
-        risk_status = f"Risk Düştü (%{risk_delta})"
+        risk_status = f"Risk Düştü (%{abs(risk_delta)})"
     else:
         risk_status = "Risk Seviyesi Aynı"
 
