@@ -5,16 +5,6 @@ const pdfSection = document.getElementById('pdf-section');
 const textSection = document.getElementById('text-section');
 const phase4Section = document.getElementById('phase4-section');
 
-const p4SubtabBatch = document.getElementById('p4-subtab-batch');
-const p4SubtabCompare = document.getElementById('p4-subtab-compare');
-const p4BatchView = document.getElementById('p4-batch-view');
-const p4CompareView = document.getElementById('p4-compare-view');
-
-const batchDropZone = document.getElementById('batch-drop-zone');
-const batchFileInput = document.getElementById('batch-file-input');
-const batchSelectedFilesList = document.getElementById('batch-selected-files-list');
-const analyzeBatchBtn = document.getElementById('analyze-batch-btn');
-
 const compareDoc1 = document.getElementById('compare-doc1');
 const compareDoc2 = document.getElementById('compare-doc2');
 const compareDocsBtn = document.getElementById('compare-docs-btn');
@@ -79,7 +69,7 @@ tabText.addEventListener('click', () => {
 
 tabPhase4.addEventListener('click', () => {
     activeTab = 'phase4';
-    tabPhase4.className = 'flex-1 py-2.5 px-3 rounded-lg font-bold text-emerald-400 bg-slate-800/90 shadow transition-all flex items-center justify-center gap-2';
+    tabPhase4.className = 'flex-1 py-2.5 px-3 rounded-lg font-bold text-indigo-400 bg-slate-800/90 shadow transition-all flex items-center justify-center gap-2';
     tabPdf.className = 'flex-1 py-2.5 px-3 rounded-lg font-bold text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center gap-2';
     tabText.className = 'flex-1 py-2.5 px-3 rounded-lg font-bold text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center gap-2';
     
@@ -88,25 +78,6 @@ tabPhase4.addEventListener('click', () => {
     textSection.classList.add('hidden');
     resultsDiv.classList.add('hidden');
     hideToast();
-});
-
-// Faz 4 Alt Sekme Seçimi
-p4SubtabBatch.addEventListener('click', () => {
-    p4Subtab = 'batch';
-    p4SubtabBatch.className = 'flex-1 py-2 rounded-md bg-emerald-600 text-white transition shadow';
-    p4SubtabCompare.className = 'flex-1 py-2 rounded-md text-slate-400 hover:text-slate-200 transition';
-    p4BatchView.classList.remove('hidden');
-    p4CompareView.classList.add('hidden');
-    resultsDiv.classList.add('hidden');
-});
-
-p4SubtabCompare.addEventListener('click', () => {
-    p4Subtab = 'compare';
-    p4SubtabCompare.className = 'flex-1 py-2 rounded-md bg-indigo-600 text-white transition shadow';
-    p4SubtabBatch.className = 'flex-1 py-2 rounded-md text-slate-400 hover:text-slate-200 transition';
-    p4CompareView.classList.remove('hidden');
-    p4BatchView.classList.add('hidden');
-    resultsDiv.classList.add('hidden');
 });
 
 
@@ -360,7 +331,13 @@ async function downloadExport(format) {
 }
 window.downloadExport = downloadExport;
 
-// Dosya Seçme / Drag-Drop (Tekil)
+// --- FAZ 4: TOPLU ANALİZ, KARŞILAŞTIRMA & EXPORT ---
+
+let selectedFilesList = [];
+const selectedFilesContainer = document.getElementById('selected-files-container');
+const analyzeFileBtn = document.getElementById('analyze-file-btn');
+
+// Dosya Seçme / Drag-Drop (Birleşik Tekil & Toplu Dropzone)
 dropZone.addEventListener('click', () => fileInput.click());
 
 dropZone.addEventListener('dragover', (e) => {
@@ -375,43 +352,66 @@ dropZone.addEventListener('dragleave', () => {
 dropZone.addEventListener('drop', (e) => {
     e.preventDefault();
     dropZone.classList.remove('border-blue-500', 'bg-slate-800/50');
-    if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+    if (e.dataTransfer.files.length > 0) {
+        handleFileSelection(Array.from(e.dataTransfer.files));
+    }
 });
 
 fileInput.addEventListener('change', (e) => {
-    if (e.target.files.length > 0) handleFile(e.target.files[0]);
+    if (e.target.files.length > 0) {
+        handleFileSelection(Array.from(e.target.files));
+    }
 });
 
-// Güvenli Response Ayrıştırma Yardımcısı
-async function parseApiResponse(response) {
-    const contentType = response.headers.get("content-type") || "";
-    
-    if (contentType.includes("application/json")) {
-        const data = await response.json();
-        if (!response.ok) {
-            throw new Error(data.detail || "Sunucu işlem sırasında bir hata bildirdi.");
-        }
-        return data;
+function handleFileSelection(files) {
+    selectedFilesList = files;
+    if (!selectedFilesContainer) return;
+
+    if (files.length === 0) {
+        selectedFilesContainer.classList.add('hidden');
+        return;
     }
-    
-    const rawText = await response.text();
-    if (response.status === 502 || response.status === 503 || response.status === 504) {
-        throw new Error("Sunucu şu anda uyanıyor (Render Cold Start). Lütfen 15-20 saniye sonra tekrar deneyin.");
+
+    if (files.length === 1) {
+        const f = files[0];
+        selectedFilesContainer.innerHTML = `
+            <div class="font-bold text-blue-400 mb-1">Seçilen Doküman (Tekil Analiz):</div>
+            <div class="flex justify-between font-mono text-xs">
+                <span>📄 ${escapeHtml(f.name)}</span>
+                <span class="text-slate-400">${(f.size / 1024).toFixed(1)} KB</span>
+            </div>
+        `;
+    } else {
+        selectedFilesContainer.innerHTML = `
+            <div class="font-bold text-blue-400 mb-1">Seçilen Dokümanlar (${files.length} Adet - Toplu Analiz):</div>
+            <div class="space-y-1">
+                ${files.map(f => `<div class="flex justify-between font-mono text-[11px]"><span>📄 ${escapeHtml(f.name)}</span><span class="text-slate-500">${(f.size / 1024).toFixed(1)} KB</span></div>`).join('')}
+            </div>
+        `;
     }
-    if (!response.ok) {
-        throw new Error(`Sunucu Hatası (${response.status}). Lütfen tekrar deneyin.`);
-    }
-    throw new Error("Beklenmeyen yanıt biçimi alındı.");
+    selectedFilesContainer.classList.remove('hidden');
 }
 
-// Dosya (PDF veya Görsel) İşleme & Gönderme
-async function handleFile(file) {
+analyzeFileBtn.addEventListener('click', async () => {
+    if (!selectedFilesList || selectedFilesList.length === 0) {
+        showToast("Lütfen analiz etmek için en az 1 adet dosya seçin.", "warning");
+        return;
+    }
+
+    if (selectedFilesList.length === 1) {
+        await processSingleFile(selectedFilesList[0]);
+    } else {
+        await processBatchFiles(selectedFilesList);
+    }
+});
+
+async function processSingleFile(file) {
     const fileName = file.name.toLowerCase();
     const isPdf = fileName.endsWith('.pdf');
     const isImage = IMAGE_EXTENSIONS.some(ext => fileName.endsWith(ext));
 
-    if (!isPdf && !isImage) {
-        showToast("Lütfen sadece geçerli bir .PDF veya Görsel (.PNG, .JPG, .JPEG, .WEBP) dosyası seçin.", "warning");
+    if (!isPdf && !isImage && !fileName.endsWith('.txt')) {
+        showToast("Lütfen geçerli bir .PDF, .TXT veya Görsel (.PNG, .JPG, .JPEG, .WEBP) dosyası seçin.", "warning");
         return;
     }
 
@@ -426,14 +426,14 @@ async function handleFile(file) {
         if (loaderSubtext) loaderSubtext.textContent = "AI Vision & OCR motoru ile görseldeki metinler okunuyor, KVKK ve risk analizi yapılıyor...";
     } else {
         if (loaderTitle) loaderTitle.textContent = "Yapay Zekâ Analiz Ediyor";
-        if (loaderSubtext) loaderSubtext.textContent = "PDF ayrıştırılıyor, taranmış sayfalar OCR ile taranıyor, KVKK maskelemesi ve özet çıkarılıyor...";
+        if (loaderSubtext) loaderSubtext.textContent = "Doküman ayrıştırılıyor, OCR ile metinler okunuyor, KVKK maskelemesi ve özet çıkarılıyor...";
     }
     hideToast();
 
     const formData = new FormData();
     formData.append("file", file);
 
-    const endpoint = isPdf ? `${API_URL}/analyze-pdf` : `${API_URL}/analyze-image`;
+    const endpoint = isPdf ? `${API_URL}/analyze-pdf` : (isImage ? `${API_URL}/analyze-image` : `${API_URL}/analyze-pdf`);
 
     try {
         const response = await fetch(endpoint, {
@@ -443,6 +443,31 @@ async function handleFile(file) {
 
         const data = await parseApiResponse(response);
         displayResults(data);
+    } catch (error) {
+        showToast(error.message, "error");
+        setLoading(false);
+    }
+}
+
+async function processBatchFiles(files) {
+    setLoading(true);
+    if (loaderTitle) loaderTitle.textContent = "Toplu Doküman Analizi Yapılıyor";
+    if (loaderSubtext) loaderSubtext.textContent = `${files.length} adet doküman sırayla ayrıştırılıyor, özetleniyor ve birleşik risk haritası oluşturuluyor...`;
+    hideToast();
+
+    const formData = new FormData();
+    for (const file of files) {
+        formData.append("files", file);
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/analyze-batch`, {
+            method: "POST",
+            body: formData
+        });
+
+        const data = await parseApiResponse(response);
+        displayBatchResults(data);
     } catch (error) {
         showToast(error.message, "error");
         setLoading(false);
