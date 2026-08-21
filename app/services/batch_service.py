@@ -21,7 +21,7 @@ def _generate_batch_executive_summary(
     # 1. Groq LLM Sentezleyici
     if is_llm_available() and doc_summaries:
         api_key = os.getenv("GROQ_API_KEY", "").strip()
-        selected_model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+        selected_model = os.getenv("GROQ_MODEL", "groq/compound-mini")
         lang_name = "Türkçe" if dominant_lang == "tr" else "English"
         
         system_prompt = (

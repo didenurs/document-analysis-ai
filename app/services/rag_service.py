@@ -153,7 +153,7 @@ def generate_rag_answer(
     # 2. LLM varsa Groq LLaMA-3.3 ile yanıtla
     if is_llm_available():
         api_key = os.getenv("GROQ_API_KEY", "").strip()
-        model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+        model = os.getenv("GROQ_MODEL", "groq/compound-mini")
         
         system_prompt = (
             f"You are a helpful, highly precise AI document assistant. "

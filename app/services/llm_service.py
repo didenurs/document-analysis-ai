@@ -25,7 +25,7 @@ def generate_llm_summary(text: str, language: str = "en", model: Optional[str] =
         return None
 
     api_key = os.getenv("GROQ_API_KEY", "").strip()
-    selected_model = model or os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    selected_model = model or os.getenv("GROQ_MODEL", "groq/compound-mini")
     
     lang_name = "Türkçe" if language == "tr" else "English"
     
@@ -85,7 +85,7 @@ def translate_text(text: str, target_language: str = "tr", model: Optional[str] 
         return None
 
     api_key = os.getenv("GROQ_API_KEY", "").strip()
-    selected_model = model or os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    selected_model = model or os.getenv("GROQ_MODEL", "groq/compound-mini")
     
     target_lang_name = "Türkçe" if target_language == "tr" else "English"
     
