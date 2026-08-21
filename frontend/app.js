@@ -18,6 +18,9 @@ const fileInput = document.getElementById('file-input');
 const selectedFilesContainer = document.getElementById('selected-files-container');
 const analyzeFileBtn = document.getElementById('analyze-file-btn');
 
+const kvkkDropZone = document.getElementById('kvkk-drop-zone');
+const kvkkFileInput = document.getElementById('kvkk-file-input');
+const kvkkSelectedFile = document.getElementById('kvkk-selected-file');
 const kvkkTextInput = document.getElementById('kvkk-text-input');
 const analyzeKvkkBtn = document.getElementById('analyze-kvkk-btn');
 const clearKvkkTextBtn = document.getElementById('clear-kvkk-text-btn');
@@ -44,6 +47,7 @@ const API_URL = getApiBaseUrl();
 
 let activeTab = 'pdf';
 let selectedFilesList = [];
+let selectedKvkkFile = null;
 
 let activeAnalysisData = null;
 let activeDocumentText = '';
@@ -155,8 +159,11 @@ function resetAnalysis() {
     if (charCount) charCount.textContent = '0 karakter';
     if (kvkkCharCount) kvkkCharCount.textContent = '0 karakter';
     if (fileInput) fileInput.value = '';
+    if (kvkkFileInput) kvkkFileInput.value = '';
     if (selectedFilesContainer) { selectedFilesContainer.classList.add('hidden'); selectedFilesContainer.innerHTML = ''; }
+    if (kvkkSelectedFile) { kvkkSelectedFile.classList.add('hidden'); kvkkSelectedFile.innerHTML = ''; }
     selectedFilesList = [];
+    selectedKvkkFile = null;
     activeAnalysisData = null;
     activeDocumentText = '';
     currentSummaryOriginal = '';
@@ -194,18 +201,58 @@ if (clearKvkkTextBtn) {
     clearKvkkTextBtn.addEventListener('click', () => {
         if (kvkkTextInput) kvkkTextInput.value = '';
         if (kvkkCharCount) kvkkCharCount.textContent = '0 karakter';
+        selectedKvkkFile = null;
+        if (kvkkSelectedFile) kvkkSelectedFile.classList.add('hidden');
         hideToast();
     });
 }
 
+// KVKK Tab File Selection
+if (kvkkDropZone) {
+    kvkkDropZone.addEventListener('click', () => { if (kvkkFileInput) kvkkFileInput.click(); });
+    kvkkDropZone.addEventListener('dragover', (e) => { e.preventDefault(); kvkkDropZone.classList.add('border-emerald-500', 'bg-emerald-950/30'); });
+    kvkkDropZone.addEventListener('dragleave', () => { kvkkDropZone.classList.remove('border-emerald-500', 'bg-emerald-950/30'); });
+    kvkkDropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        kvkkDropZone.classList.remove('border-emerald-500', 'bg-emerald-950/30');
+        if (e.dataTransfer.files.length > 0) handleKvkkFileSelection(e.dataTransfer.files[0]);
+    });
+}
+
+if (kvkkFileInput) {
+    kvkkFileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) handleKvkkFileSelection(e.target.files[0]);
+    });
+}
+
+function handleKvkkFileSelection(file) {
+    selectedKvkkFile = file;
+    if (!kvkkSelectedFile) return;
+    kvkkSelectedFile.innerHTML = `
+        <span>📄 Seçilen Doküman: <strong>${escapeHtml(file.name)}</strong> (${(file.size / 1024).toFixed(1)} KB)</span>
+        <button type="button" onclick="clearKvkkFile()" class="text-rose-400 hover:underline font-bold ml-2">✕ Kaldır</button>
+    `;
+    kvkkSelectedFile.classList.remove('hidden');
+}
+
+function clearKvkkFile() {
+    selectedKvkkFile = null;
+    if (kvkkFileInput) kvkkFileInput.value = '';
+    if (kvkkSelectedFile) {
+        kvkkSelectedFile.classList.add('hidden');
+        kvkkSelectedFile.innerHTML = '';
+    }
+}
+window.clearKvkkFile = clearKvkkFile;
+
 const SAMPLES = {
-    tr_cyber: "GİZLİ OLAY RAPORU: ACİL SALDIRI MÜDAHALESİ GEREKLİDİR Saat 02:00 sularında dahili izleme sistemlerimiz, merkezi kurumsal ağımızın birincil veritabanı güvenlik duvarında kritik bir arıza tespit etti. Son derece koordineli bir siber saldırı, bulut altyapımızda yeni keşfedilen bir sıfır gün güvenlik açığını başarıyla istismar ederek benzeri görülmemiş büyüklükte bir veri ihlaline yol açtı. Kötü niyetli saldırganlar ikincil kimlik doğrulama protokollerini ve şifreleme katmanlarını atlatmayı başararak müşterilerimizin son derece gizli finansal kayıtları için ciddi bir tehdit oluşturdu.",
+    tr_cyber: "GİZLİ OLAY RAPORU: ACİL SALDIRI MÜDAHALESİ GEREKLİDİR Saat 02:00 sularında dahili izleme sistemlerimiz, merkezi kurumsal ağımızın birincil veritabanı güvenlik duvarında kritik bir arıza tespit etti.",
     tr_kvkk: "MÜŞTERİ HESAP EKSTRESİ VE GİZLİ BİLDİRİM:\nSayın Ahmet Yılmaz, 10000000146 T.C. Kimlik numaranıza ait TR12 3456 7890 1234 5678 9012 34 IBAN numaralı hesabınızdan 4543-1234-5678-9012 numaralı kredi kartınıza ödeme yapılmıştır. Detaylı bilgi için müşteri temsilciniz ile ahmet.yilmaz@kurumsal.com veya 0532 123 45 67 üzerinden iletişime geçebilirsiniz. Güvenlik bağlantı IP adresi: 192.168.1.105.",
-    tr_finance: "Üçüncü Çeyrek Finansal Raporu: Şirketimiz bulut ve yapay zekâ yazılım ürünlerine olan yüksek talep sayesinde faaliyet gelirlerinde %28 oranında rekor büyüme kaydetti. İşletme giderleri %6 oranında azalırken net kâr marjı güçlendi ve serbest nakit akışı genişledi.",
+    tr_finance: "Üçüncü Çeyrek Finansal Raporu: Şirketimiz bulut ve yapay zekâ yazılım ürünlerine olan yüksek talep sayesinde faaliyet gelirlerinde %28 oranında rekor büyüme kaydetti.",
     tr_short: "Bugün üniversitede yapay zekâ ve derin öğrenme modelleri üzerine kapsamlı bir ders işlendi.",
-    en_cyber: "CONFIDENTIAL INCIDENT REPORT: IMMEDIATE ATTACK RESPONSE REQUIRED At 02:00 AM standard time, our internal monitoring systems detected a critical failure in the primary database firewall of our central corporate network. A highly coordinated cyber attack successfully exploited a newly discovered zero-day vulnerability in our cloud infrastructure, leading to a massive data breach.",
+    en_cyber: "CONFIDENTIAL INCIDENT REPORT: IMMEDIATE ATTACK RESPONSE REQUIRED At 02:00 AM standard time, our internal monitoring systems detected a critical failure in the primary database firewall of our central corporate network.",
     en_kvkk: "EMPLOYEE CONFIDENTIAL RECORD:\nEmployee Dr. John Watson with SSN 123-45-6789 and company email john.watson@enterprise.com has been assigned internal server IP 10.0.0.45. Emergency phone contact is +1 (555) 234-5678. Corporate card: 4111-2222-3333-4444.",
-    en_finance: "Quarterly Financial Overview: The company achieved a record 24% growth in operating revenue driven by strong enterprise software adoption. Operating expenses decreased by 8%, resulting in improved net profit margins and sustainable free cash flow expansion.",
+    en_finance: "Quarterly Financial Overview: The company achieved a record 24% growth in operating revenue driven by strong enterprise software adoption.",
     en_short: "FastAPI is a modern, high-performance web framework for building APIs with Python."
 };
 
@@ -320,7 +367,7 @@ if (analyzeFileBtn) {
     });
 }
 
-async function processSingleFile(file) {
+async function processSingleFile(file, autoScrollToMasked = false) {
     const fileName = file.name.toLowerCase();
     const isPdf = fileName.endsWith('.pdf');
     const isImage = IMAGE_EXTENSIONS.some(ext => fileName.endsWith(ext));
@@ -347,7 +394,7 @@ async function processSingleFile(file) {
     try {
         const response = await fetch(endpoint, { method: 'POST', body: formData });
         const data = await parseApiResponse(response);
-        displayResults(data);
+        displayResults(data, autoScrollToMasked);
     } catch (error) {
         showToast(error.message, 'error');
         setLoading(false);
@@ -373,9 +420,14 @@ async function processBatchFiles(files) {
 
 if (analyzeKvkkBtn) {
     analyzeKvkkBtn.addEventListener('click', async () => {
+        if (selectedKvkkFile) {
+            await processSingleFile(selectedKvkkFile, true);
+            return;
+        }
+
         const textContent = kvkkTextInput ? kvkkTextInput.value.trim() : '';
         if (!textContent) {
-            showToast('Lütfen maskelenecek bir metin girin.', 'warning');
+            showToast('Lütfen maskelenecek bir PDF/Görsel dosyası seçin veya metin girin.', 'warning');
             return;
         }
         setLoading(true);
@@ -389,7 +441,7 @@ if (analyzeKvkkBtn) {
                 body: JSON.stringify({ text: textContent })
             });
             const data = await parseApiResponse(response);
-            displayResults(data, true); // Auto-jump to masked text!
+            displayResults(data, true);
         } catch (error) {
             showToast(error.message, 'error');
             setLoading(false);
@@ -762,7 +814,6 @@ function displayResults(data, autoScrollToMasked = false) {
     resultsDiv.innerHTML = `
         <div class="p-4 sm:p-6 rounded-2xl glass-inner border border-blue-500/30 shadow-2xl space-y-4 animate-fade-in">
             
-            <!-- Hızlı Gezinti Çubuğu -->
             <div class="flex flex-wrap items-center justify-between gap-1.5 p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs">
                 <span class="text-[11px] font-bold text-slate-400 flex items-center gap-1 pl-1">🚀 Hızlı Erişim:</span>
                 <div class="flex flex-wrap gap-1">
@@ -803,7 +854,6 @@ function displayResults(data, autoScrollToMasked = false) {
 
             ${anomalyCardHtml}
 
-            <!-- 1. Özeti Bölümü -->
             <div id="summary-section" class="p-4 rounded-xl bg-slate-950/90 border border-blue-500/20 space-y-2 relative transition-all">
                 <div class="flex items-center justify-between flex-wrap gap-2 border-b border-slate-800/80 pb-2">
                     <div class="flex items-center gap-2">
@@ -822,7 +872,6 @@ function displayResults(data, autoScrollToMasked = false) {
                 <div class="flex flex-wrap gap-1.5">${keywordsHtml}</div>
             </div>
 
-            <!-- 2. KVKK / PII Maskelenmiş Metin Bölümü -->
             <div id="masked-text-section" class="p-4 rounded-xl bg-slate-950/90 border border-emerald-500/30 space-y-2.5 transition-all">
                 <div class="flex items-center justify-between flex-wrap gap-2 border-b border-slate-800 pb-2">
                     <div class="flex items-center gap-2">
@@ -871,7 +920,6 @@ function displayResults(data, autoScrollToMasked = false) {
             </div>
             ` : ''}
 
-            <!-- 3. Dokümana Soru Sor Bölümü -->
             <div id="chat-section" class="p-4 sm:p-5 rounded-2xl glass-inner border border-indigo-500/30 shadow-xl space-y-3.5 transition-all">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
@@ -898,14 +946,13 @@ function displayResults(data, autoScrollToMasked = false) {
 
                 <form id="chat-form" onsubmit="event.preventDefault(); sendChatMessage();" class="flex gap-2">
                     <input type="text" id="chat-input" placeholder="${isTurkish ? 'Doküman hakkında bir soru sorun...' : 'Ask a question about this document...'}" class="flex-1 px-3.5 py-2.5 bg-slate-950/90 border border-slate-800 rounded-xl text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition" autocomplete="off">
-                    <button type="submit" id="chat-send-btn" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white rounded-xl text-xs sm:text-sm font-bold transition shadow-lg shadow-indigo-600/30 flex items-center gap-1.5 shrink-0">
+                    <button type="submit" id="chat-send-btn" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:scale-[0.99] text-white rounded-xl text-xs sm:text-sm font-bold transition shadow-lg shadow-indigo-600/30 flex items-center gap-1.5 shrink-0">
                         <span>Gönder</span>
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
                     </button>
                 </form>
             </div>
 
-            <!-- 4. Rapor Dışa Aktar Bölümü -->
             <div id="export-section" class="p-3.5 rounded-xl glass-inner border border-emerald-500/30 flex flex-wrap items-center justify-between gap-2 shadow font-sans transition-all">
                 <div class="flex items-center gap-2">
                     <span class="text-base">📥</span>

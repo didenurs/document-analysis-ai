@@ -6,7 +6,7 @@
     <title>AI Doküman Analizi, OCR & KVKK Maskeleme</title>
     <meta name="description" content="PDF, görseller ve metin dosyalarını yapay zekâ ile özetleyen, KVKK/PII kişisel verilerini maskeleyen ve güvenlik risklerini değerlendiren akıllı platform.">
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="style.css?v=1.0.3">
+    <link rel="stylesheet" href="style.css?v=1.0.4">
     <style>
         html { scroll-behavior: smooth; }
         .highlight-pulse { animation: pulseBorder 1.5s ease-in-out; }
@@ -85,18 +85,30 @@
             </button>
         </section>
 
-        <!-- 2. SEKMELİ BÖLÜM: Doğrudan KVKK / PII Veri Maskeleme Modu -->
+        <!-- 2. SEKMELİ BÖLÜM: Doğrudan KVKK / PII Veri Maskeleme Modu (Metin & PDF Destekli) -->
         <section id="kvkk-section" class="hidden space-y-3.5">
             <div class="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-start gap-2.5">
                 <span class="text-base">🛡️</span>
                 <div>
-                    <strong class="font-bold block text-sm">Hızlı Kişisel Veri (KVKK / PII) Maskeleme</strong>
-                    <span>Metninizdeki TCKN, İsim, E-posta, Telefon, IBAN, Kredi Kartı ve IP adresleri anında [MASKELENDİ] formatına çevrilir.</span>
+                    <strong class="font-bold block text-sm">Doğrudan Kişisel Veri (KVKK / PII) Maskeleme</strong>
+                    <span>PDF dokümanı yükleyebilir veya metin yapıştırabilirsiniz. TCKN, İsim, E-posta, Telefon, IBAN, Kredi Kartı ve IP adresleri anında [MASKELENDİ] formatına çevrilir.</span>
                 </div>
             </div>
-            
+
+            <!-- KVKK Dosya Yükleme / Sürükle Bırak Alanı -->
+            <div id="kvkk-drop-zone" class="border-2 border-dashed border-emerald-500/30 rounded-2xl p-5 sm:p-6 text-center cursor-pointer hover:border-emerald-500 hover:bg-emerald-950/20 active:scale-[0.99] transition-all duration-200">
+                <div class="w-10 h-10 mx-auto mb-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                </div>
+                <p class="text-xs sm:text-sm font-bold text-slate-100">PDF, Görsel veya TXT dosyanızı buraya bırakın veya tıklayın</p>
+                <p class="text-[11px] text-slate-400 mt-0.5">Maskelenecek dokümanı seçin (.PDF, .PNG, .JPG, .TXT — Maks 15MB)</p>
+                <input type="file" id="kvkk-file-input" class="hidden" accept=".pdf,image/png,image/jpeg,image/webp,image/bmp,image/tiff,application/pdf,.txt">
+            </div>
+
+            <div id="kvkk-selected-file" class="hidden p-2.5 rounded-xl bg-slate-950/80 border border-emerald-500/40 text-xs text-emerald-300 flex items-center justify-between font-mono"></div>
+
             <div class="relative">
-                <textarea id="kvkk-text-input" rows="5" class="w-full p-3.5 sm:p-4 bg-slate-950/90 border border-emerald-500/30 rounded-xl focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 focus:outline-none text-slate-100 text-xs sm:text-sm placeholder-slate-500 transition leading-relaxed resize-y" placeholder="Hassas veri içeren metni yapıştırın (örn. İsim, TCKN, IBAN, Telefon numaraları)..."></textarea>
+                <textarea id="kvkk-text-input" rows="4" class="w-full p-3.5 sm:p-4 bg-slate-950/90 border border-emerald-500/30 rounded-xl focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 focus:outline-none text-slate-100 text-xs sm:text-sm placeholder-slate-500 transition leading-relaxed resize-y" placeholder="Veya metni buraya yazın/yapıştırın (örn. İsim, TCKN, IBAN, Telefon numaraları)..."></textarea>
                 <div class="flex justify-between items-center px-1.5 mt-1 text-xs text-slate-400">
                     <span id="kvkk-char-count">0 karakter</span>
                     <button id="clear-kvkk-text-btn" type="button" class="hover:text-rose-400 transition font-medium">Temizle</button>
@@ -279,6 +291,6 @@
         </div>
     </div>
 
-    <script src="app.js?v=1.0.6"></script>
+    <script src="app.js?v=1.0.7"></script>
 </body>
 </html>
