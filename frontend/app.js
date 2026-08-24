@@ -882,17 +882,14 @@ function displayResults(data, autoScrollToMasked = false) {
                             <span>🔒</span> İşlenmiş Doküman Metni (PII Maskeli)
                         </span>
                     </div>
-                    <div class="flex flex-wrap gap-2">
+                    <div class="flex gap-2">
                         <button id="toggle-mask-btn" onclick="toggleMaskedTextView()" class="text-xs font-semibold px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:bg-amber-500/30 transition">👁️ Orijinal Metni Gör</button>
-                        <button id="copy-masked-btn" onclick="copyMaskedDocument()" class="text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 hover:border-emerald-500 text-emerald-300 transition flex items-center gap-1">
+                        <button id="copy-masked-btn" onclick="copyMaskedDocument()" class="text-xs font-bold px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition shadow shadow-emerald-600/30 flex items-center gap-1">
                             📋 Metni Kopyala
-                        </button>
-                        <button id="download-masked-pdf-btn" onclick="downloadExport('masked-pdf')" class="text-xs font-bold px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition shadow shadow-emerald-600/30 flex items-center gap-1">
-                            📥 Maskelenmiş PDF İndir
                         </button>
                     </div>
                 </div>
-                <p class="text-[11px] text-slate-400">Metindeki tüm kişisel veriler (TCKN, İsim, E-posta, Telefon, IBAN) ayıklanıp [MASKELENDİ] etiketleriyle değiştirilmiştir. Bu metni kopyalayabilir veya doğrudan maskelenmiş PDF olarak indirebilirsiniz.</p>
+                <p class="text-[11px] text-slate-400">Metindeki tüm kişisel veriler (TCKN, İsim, E-posta, Telefon, IBAN) ayıklanıp [MASKELENDİ] etiketleriyle değiştirilmiştir. Bu metni güvenle kopyalayıp kullanabilirsiniz.</p>
                 <div id="document-text-content" class="p-3 rounded-lg bg-slate-900/90 border border-slate-800/80 text-xs font-mono text-slate-200 max-h-56 overflow-y-auto whitespace-pre-wrap leading-relaxed">
                     ${escapeHtml(data.masked_text || data.cleaned_text)}
                 </div>
