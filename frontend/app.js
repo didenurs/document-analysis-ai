@@ -962,13 +962,11 @@ function displayResults(data, autoScrollToMasked = false) {
             <div id="export-section" class="p-3.5 rounded-xl glass-inner border border-emerald-500/30 flex flex-wrap items-center justify-between gap-2 shadow font-sans transition-all">
                 <div class="flex items-center gap-2">
                     <span class="text-base">📥</span>
-                    <span class="text-xs font-bold text-emerald-400 uppercase tracking-wider">Rapor & Doküman İndir</span>
+                    <span class="text-xs font-bold text-emerald-400 uppercase tracking-wider">Diğer Formatlarda Rapor İndir</span>
                 </div>
                 <div class="flex items-center gap-1.5 flex-wrap">
                     <button type="button" onclick="downloadExport('json')" class="px-2.5 py-1 bg-slate-900 border border-slate-700 hover:border-emerald-500 text-xs font-semibold text-slate-200 rounded-lg transition">JSON</button>
                     <button type="button" onclick="downloadExport('csv')" class="px-2.5 py-1 bg-slate-900 border border-slate-700 hover:border-emerald-500 text-xs font-semibold text-emerald-300 rounded-lg transition">📊 CSV</button>
-                    <button type="button" onclick="downloadExport('masked-pdf')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white rounded-lg transition shadow flex items-center gap-1">🔒 Maskelenmiş PDF</button>
-                    <button type="button" onclick="downloadExport('pdf')" class="px-3 py-1 bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white rounded-lg transition shadow flex items-center gap-1">📕 Detaylı PDF Rapor</button>
                     <button type="button" onclick="downloadExport('html')" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-white rounded-lg transition shadow">📄 HTML Rapor</button>
                 </div>
             </div>
@@ -1003,8 +1001,7 @@ function displayBatchResults(data) {
                 <div class="flex gap-1.5">
                     <button type="button" onclick="downloadExport('json')" class="px-2.5 py-1 bg-slate-900 border border-slate-700 hover:border-emerald-500 text-xs font-semibold text-slate-200 rounded-lg">JSON</button>
                     <button type="button" onclick="downloadExport('csv')" class="px-2.5 py-1 bg-slate-900 border border-slate-700 hover:border-emerald-500 text-xs font-semibold text-emerald-300 rounded-lg">📊 CSV</button>
-                    <button type="button" onclick="downloadExport('pdf')" class="px-3 py-1 bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white rounded-lg transition shadow flex items-center gap-1">📕 PDF Rapor</button>
-                    <button type="button" onclick="downloadExport('html')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white rounded-lg">📄 HTML Rapor</button>
+                    <button type="button" onclick="downloadExport('html')" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-white rounded-lg">📄 HTML Rapor</button>
                 </div>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
