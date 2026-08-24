@@ -53,6 +53,8 @@ def test_export_service():
     html = generate_html_report(sample_data)
     assert "Doc Analysis AI" in html
     assert "Test Özeti" in html
+    assert "print-btn" not in html
+    assert "PDF Olarak Kaydet" not in html
 
 def test_api_compare_documents():
     payload = {
@@ -85,7 +87,8 @@ def test_api_export_endpoints():
             "summary": "Rapor Özeti",
             "category": "Finance",
             "risk_level": "Low",
-            "risk_score": 10
+            "risk_score": 10,
+            "masked_text": "Sayın A*** Y***** TCKN 100*****46"
         },
         "export_format": "json"
     }
@@ -101,3 +104,16 @@ def test_api_export_endpoints():
     resp_html = client.post("/export/html", json=payload)
     assert resp_html.status_code == 200
     assert "text/html" in resp_html.headers["content-type"]
+    assert "print-btn" not in resp_html.text
+
+    resp_pdf = client.post("/export/pdf", json=payload)
+    assert resp_pdf.status_code == 200
+    assert "application/pdf" in resp_pdf.headers["content-type"]
+    assert len(resp_pdf.content) > 0
+
+    resp_masked_pdf = client.post("/export/masked-pdf", json=payload)
+    assert resp_masked_pdf.status_code == 200
+    assert "application/pdf" in resp_masked_pdf.headers["content-type"]
+    assert "maskelenmis_dokuman.pdf" in resp_masked_pdf.headers.get("content-disposition", "")
+    assert len(resp_masked_pdf.content) > 0
+

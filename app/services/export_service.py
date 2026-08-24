@@ -24,7 +24,7 @@ def generate_pdf_report(data: Dict[str, Any]) -> bytes:
             y = margin
 
     # 1. BAŞLIK VE LOGO BÖLÜMÜ
-    title = "Toplu Doküman Analiz Raporu" if "documents" in data else "Doküman Analiz & Risk Raporu"
+    title = data.get("title_override") or ("Toplu Doküman Analiz Raporu" if "documents" in data else "Doküman Analiz & Risk Raporu")
     
     # Başlık arka plan şeridi
     page.draw_rect(pymupdf.Rect(margin, y, margin + usable_width, y + 45), color=(0.06, 0.09, 0.16), fill=(0.06, 0.09, 0.16))
@@ -127,6 +127,17 @@ def generate_pdf_report(data: Dict[str, Any]) -> bytes:
 
     return doc.tobytes()
 
+
+def generate_masked_pdf_report(data: Dict[str, Any]) -> bytes:
+    """
+    Sadece maskelenmiş doküman metnini ve temel KVKK statüsünü içeren,
+    doğrudan 3. şahıslara gönderilmeye hazır temiz maskelenmiş PDF belgesi üretir.
+    """
+    # data kopyası üzerinden başlığı maskeli doküman olarak ayarla
+    masked_data = dict(data)
+    if "documents" not in masked_data:
+        masked_data["title_override"] = "Kişisel Verileri Maskelenmiş Doküman (Redacted PDF)"
+    return generate_pdf_report(masked_data)
 
 
 def generate_json_bytes(data: Dict[str, Any]) -> bytes:
@@ -344,38 +355,10 @@ def generate_html_report(data: Dict[str, Any]) -> str:
             color: #94a3b8;
             background-color: #1e293b;
         }}
-        .print-btn {{
-            background: #10b981;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: bold;
-            cursor: pointer;
-            font-size: 13px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-            transition: all 0.2s;
-        }}
-        .print-btn:hover {{
-            background: #059669;
-        }}
-        @media print {{
-            .no-print {{ display: none !important; }}
-            body {{ background-color: #fff; color: #000; padding: 0; }}
-            .container {{ background-color: #fff; border: none; box-shadow: none; max-width: 100%; }}
-            .box {{ background-color: #f8fafc; border: 1px solid #cbd5e1; color: #000; page-break-inside: avoid; }}
-            .box-title {{ color: #475569; }}
-            h1 {{ color: #0284c7; }}
-            th {{ background-color: #f1f5f9; color: #334155; }}
-            td {{ border-bottom: 1px solid #e2e8f0; }}
-        }}
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="no-print" style="text-align: right; margin-bottom: 16px;">
-            <button onclick="window.print()" class="print-btn">🖨️ PDF Olarak Kaydet / Yazdır</button>
-        </div>
         <div class="header">
             <div>
                 <h1>🤖 Doc Analysis AI - {title}</h1>

@@ -297,7 +297,7 @@ from app.models.schemas import (
 )
 from app.services.batch_service import aggregate_batch_results
 from app.services.compare_service import compare_two_documents
-from app.services.export_service import generate_json_bytes, generate_csv_bytes, generate_html_report
+from app.services.export_service import generate_json_bytes, generate_csv_bytes, generate_html_report, generate_pdf_report, generate_masked_pdf_report
 
 @router.post("/analyze-batch", response_model=BatchAnalysisResponse)
 async def analyze_batch_files(files: ListType[UploadFile] = File(...)):
@@ -407,6 +407,17 @@ def export_pdf_endpoint(request: ExportRequest):
         media_type="application/pdf",
         headers={"Content-Disposition": "attachment; filename=doc_analysis_report.pdf"}
     )
+
+@router.post("/export/masked-pdf")
+def export_masked_pdf_endpoint(request: ExportRequest):
+    """Kişisel verileri maskelenmiş dokümanı doğrudan tek tıkla indirilebilir .PDF dosyası olarak verir."""
+    pdf_bytes = generate_masked_pdf_report(request.analysis_data)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=maskelenmis_dokuman.pdf"}
+    )
+
 
 # --- FAZ 5 ENDPOINT'LERİ (Anomali, Akıllı Aksiyon Motoru, Metrikler & Webhook) ---
 

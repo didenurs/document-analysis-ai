@@ -530,17 +530,20 @@ async function downloadExport(format) {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `doc_analysis_report.${format}`;
+        const defaultFilename = (format === 'masked-pdf') ? 'maskelenmis_dokuman.pdf' : `doc_analysis_report.${format}`;
+        a.download = defaultFilename;
         document.body.appendChild(a);
         a.click();
         a.remove();
         window.URL.revokeObjectURL(url);
-        showToast(`Analiz raporu .${format.toUpperCase()} olarak indirildi!`, 'success');
+        const formatLabel = format === 'masked-pdf' ? 'Maskelenmiş PDF' : `.${format.toUpperCase()}`;
+        showToast(`Doküman / Rapor ${formatLabel} olarak indirildi!`, 'success');
     } catch (err) {
         showToast(err.message, 'error');
     }
 }
 window.downloadExport = downloadExport;
+
 
 function copySummary() {
     const summaryText = document.getElementById('summary-content')?.innerText || '';
@@ -879,14 +882,17 @@ function displayResults(data, autoScrollToMasked = false) {
                             <span>🔒</span> İşlenmiş Doküman Metni (PII Maskeli)
                         </span>
                     </div>
-                    <div class="flex gap-2">
+                    <div class="flex flex-wrap gap-2">
                         <button id="toggle-mask-btn" onclick="toggleMaskedTextView()" class="text-xs font-semibold px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:bg-amber-500/30 transition">👁️ Orijinal Metni Gör</button>
-                        <button id="copy-masked-btn" onclick="copyMaskedDocument()" class="text-xs font-bold px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition shadow shadow-emerald-600/30 flex items-center gap-1">
-                            📋 Maskeli Metni Kopyala
+                        <button id="copy-masked-btn" onclick="copyMaskedDocument()" class="text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 hover:border-emerald-500 text-emerald-300 transition flex items-center gap-1">
+                            📋 Metni Kopyala
+                        </button>
+                        <button id="download-masked-pdf-btn" onclick="downloadExport('masked-pdf')" class="text-xs font-bold px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition shadow shadow-emerald-600/30 flex items-center gap-1">
+                            📥 Maskelenmiş PDF İndir
                         </button>
                     </div>
                 </div>
-                <p class="text-[11px] text-slate-400">Metindeki tüm kişisel veriler (TCKN, İsim, E-posta, Telefon, IBAN) ayıklanıp [MASKELENDİ] etiketleriyle değiştirilmiştir. Bu metni güvenle kopyalayıp kullanabilirsiniz.</p>
+                <p class="text-[11px] text-slate-400">Metindeki tüm kişisel veriler (TCKN, İsim, E-posta, Telefon, IBAN) ayıklanıp [MASKELENDİ] etiketleriyle değiştirilmiştir. Bu metni kopyalayabilir veya doğrudan maskelenmiş PDF olarak indirebilirsiniz.</p>
                 <div id="document-text-content" class="p-3 rounded-lg bg-slate-900/90 border border-slate-800/80 text-xs font-mono text-slate-200 max-h-56 overflow-y-auto whitespace-pre-wrap leading-relaxed">
                     ${escapeHtml(data.masked_text || data.cleaned_text)}
                 </div>
@@ -956,13 +962,14 @@ function displayResults(data, autoScrollToMasked = false) {
             <div id="export-section" class="p-3.5 rounded-xl glass-inner border border-emerald-500/30 flex flex-wrap items-center justify-between gap-2 shadow font-sans transition-all">
                 <div class="flex items-center gap-2">
                     <span class="text-base">📥</span>
-                    <span class="text-xs font-bold text-emerald-400 uppercase tracking-wider">Raporu İndir</span>
+                    <span class="text-xs font-bold text-emerald-400 uppercase tracking-wider">Rapor & Doküman İndir</span>
                 </div>
-                <div class="flex items-center gap-1.5">
+                <div class="flex items-center gap-1.5 flex-wrap">
                     <button type="button" onclick="downloadExport('json')" class="px-2.5 py-1 bg-slate-900 border border-slate-700 hover:border-emerald-500 text-xs font-semibold text-slate-200 rounded-lg transition">JSON</button>
                     <button type="button" onclick="downloadExport('csv')" class="px-2.5 py-1 bg-slate-900 border border-slate-700 hover:border-emerald-500 text-xs font-semibold text-emerald-300 rounded-lg transition">📊 CSV</button>
-                    <button type="button" onclick="downloadExport('pdf')" class="px-3 py-1 bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white rounded-lg transition shadow flex items-center gap-1">📕 PDF Rapor</button>
-                    <button type="button" onclick="downloadExport('html')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white rounded-lg transition shadow">📄 HTML Rapor</button>
+                    <button type="button" onclick="downloadExport('masked-pdf')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white rounded-lg transition shadow flex items-center gap-1">🔒 Maskelenmiş PDF</button>
+                    <button type="button" onclick="downloadExport('pdf')" class="px-3 py-1 bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white rounded-lg transition shadow flex items-center gap-1">📕 Detaylı PDF Rapor</button>
+                    <button type="button" onclick="downloadExport('html')" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-white rounded-lg transition shadow">📄 HTML Rapor</button>
                 </div>
             </div>
 
