@@ -667,7 +667,38 @@ async function toggleSummaryTranslation() {
 }
 window.toggleSummaryTranslation = toggleSummaryTranslation;
 
+
+function buildRiskBreakdownHtml(data) {
+    const rb = (data.risk_breakdown) || {};
+    const sec  = rb.security_threat   || { score: 0, level: 'LOW' };
+    const priv = rb.privacy_exposure  || { score: 0, level: 'LOW' };
+    const sens = rb.sensitive_data    || { score: 0, level: 'LOW' };
+
+    function riskCard(icon, label, dim) {
+        const lvl = dim.level || 'LOW';
+        const colorMap = {
+            'LOW':      'bg-emerald-500/10 border-emerald-500/30 text-emerald-400',
+            'MEDIUM':   'bg-amber-500/10 border-amber-500/30 text-amber-400',
+            'HIGH':     'bg-orange-500/10 border-orange-500/30 text-orange-400',
+            'CRITICAL': 'bg-rose-500/10 border-rose-500/40 text-rose-400',
+        };
+        const labelMap = { LOW: 'Düşük', MEDIUM: 'Orta', HIGH: 'Yüksek', CRITICAL: 'Kritik' };
+        const cls = colorMap[lvl] || colorMap['LOW'];
+        const lbl = labelMap[lvl] || lvl;
+        return `<div class="p-3 rounded-xl bg-slate-950/60 border ${cls.split(' ')[1]} space-y-1">
+            <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">${icon} ${label}</span>
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded ${cls} text-xs font-extrabold">${lbl} (${dim.score || 0})</span>
+            ${dim.factors && dim.factors.length > 0 ? `<div class="text-[10px] text-slate-500 pt-0.5">${dim.factors.slice(0,3).join(', ')}</div>` : ''}
+        </div>`;
+    }
+
+    return riskCard('🔐', 'Gizlilik Riski', priv)
+         + riskCard('🛡️', 'Güvenlik Tehdidi', sec)
+         + riskCard('🧬', 'Hassas Veri', sens);
+}
+
 function getRiskBadge(level, score) {
+
     if (level === 'High') {
         return `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-500/15 border border-rose-500/40 text-rose-400 font-extrabold text-xs">🚨 Yüksek Risk (Skor: ${score})</span>`;
     } else if (level === 'Medium') {
@@ -779,9 +810,11 @@ function displayResults(data, autoScrollToMasked = false) {
     const methodBadge = getMethodBadge(data.extraction_method, data.page_count);
     const targetLangLabel = isTurkish ? 'English' : 'Türkçe';
     const langBadge = `<span id="summary-lang-indicator" class="${isTurkish ? 'lang-badge-tr' : 'lang-badge-en'}">${data.language_label || data.language.toUpperCase()}</span>`;
-    const categoryText = isTurkish 
-        ? `📂 Kategori: <strong class="text-blue-400 font-bold">${escapeHtml(data.category)}</strong>`
-        : `📂 Category: <strong class="text-blue-400 font-bold">${escapeHtml(data.category)}</strong>`;
+    // category_label yeni alan (IDENTITY_CARD → "Kimlik / Pasaport Belgesi" vb.)
+    const categoryDisplay = data.category_label || data.category;
+    const categoryText = isTurkish
+        ? `📂 Doküman Tipi: <strong class="text-blue-400 font-bold">${escapeHtml(categoryDisplay)}</strong>`
+        : `📂 Category: <strong class="text-blue-400 font-bold">${escapeHtml(categoryDisplay)}</strong>`;
 
     let keywordsHtml = (data.keywords || []).map(kw => `<span class="px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/25 text-blue-300 text-xs font-semibold hover:bg-blue-500/20 transition">#${escapeHtml(kw)}</span>`).join('');
 
@@ -792,11 +825,29 @@ function displayResults(data, autoScrollToMasked = false) {
     }
 
     const kvkk = data.kvkk_report || {};
+    // ── Residual Scan Bazlı "Temiz" Mesajı ──────────────────────────────────
+    const rv = data.redaction_verification || {};
     let piiBadgesHtml = '';
-    if (data.pii_entities && data.pii_entities.length > 0) {
-        piiBadgesHtml = data.pii_entities.map(p => `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-medium"><span class="font-bold text-rose-400">${escapeHtml(p.label)}:</span> ${escapeHtml(p.masked_value || p.text)}</span>`).join('');
+    const entities = data.entities || [];
+    if (entities.length > 0) {
+        piiBadgesHtml = entities.map(p =>
+            `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-medium"><span class="font-bold text-rose-400">${escapeHtml(p.label)}:</span> ${escapeHtml(p.masked_value || p.text)}</span>`
+        ).join('');
+        // Residual scan durumu
+        if (rv.status === 'VERIFIED') {
+            piiBadgesHtml += `<div class="w-full mt-2 text-xs text-emerald-400 font-semibold flex items-center gap-1">
+                ✅ Maskeleme Doğrulandı — ${rv.detected || 0} varlık tespit edildi, ${rv.masked || 0} maskelendi, kalan sızıntı yok (${rv.coverage_percent || 100}%)
+            </div>`;
+        } else if (rv.status === 'INCOMPLETE') {
+            piiBadgesHtml += `<div class="w-full mt-2 text-xs text-amber-400 font-semibold flex items-center gap-1">
+                ⚠️ Maskeleme Eksik — ${rv.residual || 0} varlık maskelenemedin kaydedildi. Lütfen manuel kontrol yapın.
+            </div>`;
+        }
+    } else if (rv.status === 'VERIFIED' || rv.detected === 0) {
+        // Hiç PII yoktu ve verified
+        piiBadgesHtml = '<span class="text-xs text-emerald-400 font-semibold">🛡️ Kişisel Veri Tespit Edilmedi — Belge temiz.</span>';
     } else {
-        piiBadgesHtml = '<span class="text-xs text-emerald-400 font-semibold">🛡️ Temiz — TCKN, İsim, E-posta veya Telefon sızıntısı bulunamadı.</span>';
+        piiBadgesHtml = '<span class="text-xs text-slate-400 font-semibold">Veri tespiti tamamlanmadı.</span>';
     }
 
     const recs = data.action_recommendations || [];
@@ -836,18 +887,14 @@ function displayResults(data, autoScrollToMasked = false) {
                 <div>${methodBadge}</div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div class="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
-                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Güvenlik Risk Düzeyi</span>
-                    <div class="pt-1">${riskBadge}</div>
-                    ${riskReasonsHtml}
-                </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                ${buildRiskBreakdownHtml(data)}
 
                 <div class="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
                     <div class="flex items-center justify-between">
-                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">KVKK / PII Uyum Durumu</span>
-                        <span class="text-[10px] font-bold px-2 py-0.5 rounded ${kvkk.risk_level === 'Clean' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}">
-                            ${kvkk.risk_level || 'GÜVENLİ'}
+                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">KVKK / PII Durumu</span>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded ${kvkk.risk_level === 'Low' ? 'bg-emerald-500/20 text-emerald-300' : kvkk.risk_level === 'High' ? 'bg-rose-500/20 text-rose-300' : 'bg-amber-500/20 text-amber-300'}">
+                            ${kvkk.kvkk_risk_label || kvkk.risk_level || 'GÜVENLİ'}
                         </span>
                     </div>
                     <p class="text-xs font-semibold text-slate-200 pt-1">${kvkk.status || 'Hassas Veri İçermiyor'}</p>

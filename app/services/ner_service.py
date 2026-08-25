@@ -44,7 +44,15 @@ PATTERNS = {
     "BIRTH_DATE": r'\b(?:0[1-9]|[12][0-9]|3[01])[\.\/\-](?:0[1-9]|1[0-2])[\.\/\-](?:19|20)\d{2}\b',
     "LICENSE_PLATE": r'\b(?:0[1-9]|[1-7][0-9]|8[01])\s?[A-Z]{1,3}\s?\d{2,4}\b',
     "SERIAL_NO": r'\b[A-Z]\d{2}\s?[A-Z0-9]\d{5}\b',
-    "MRZ": r'I<TUR[A-Z0-9<]+',
+    # Kimlik belgesi seri/belge numarası: örn. A12 B34567, A123456789
+    "DOCUMENT_NUMBER": r'\b[A-Z]{1,2}\d{7,9}\b',
+    # Geçerlilik tarihi (Kimlik, pasaport) — dd.mm.yyyy formatı
+    "EXPIRY_DATE": r'\b(?:geçerlilik|validity|expiry|expiration)[^\n]{0,30}(?:0[1-9]|[12][0-9]|3[01])[\.\/\-](?:0[1-9]|1[0-2])[\.\/\-](?:20)\d{2}\b',
+    # Ad Soyad satırı (kimlik belgelerinde)
+    "FULL_NAME": r'(?:(?:soyad|surname|ad|given name|isim)\s*[:\/]\s*)([A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+)+)',
+    # LinkedIn, GitHub, Twitter profil linkleri
+    "SOCIAL_PROFILE": r'\b(?:linkedin\.com/in/|github\.com/|twitter\.com/|instagram\.com/)[\w.\-/]+\b',
+    "MRZ": r'[IP]<TUR[A-Z0-9<]+',
     "BIOMETRIC_NOTICE": r'\b(?:biyometrik|parmak\s?izi|yüz\s?tanıma|biyometrik\s?imza|retina\s?taraması)\b'
 }
 
@@ -63,14 +71,18 @@ def _mask_value(value: str, entity_type: str, mode: str = "starred") -> str:
         "CREDIT_CARD": "KREDİ KARTI",
         "IP_ADDRESS": "IP ADRESİ",
         "NAME": "KİŞİ",
+        "FULL_NAME": "AD SOYAD",
         "API_KEY": "API ANAHTARI",
         "BIRTH_DATE": "DOĞUM TARİHİ",
         "LICENSE_PLATE": "ARAÇ PLAKASI",
         "SERIAL_NO": "SERİ NO",
+        "DOCUMENT_NUMBER": "BELGE NUMARASI",
+        "EXPIRY_DATE": "GEÇERLİLİK TARİHİ",
         "PARENTS_NAME": "ANNE/BABA ADI",
         "GENDER": "CİNSİYET",
         "NATIONALITY": "UYRUK",
         "ADDRESS": "ADRES",
+        "SOCIAL_PROFILE": "SOSYAL PROFİL",
         "MRZ": "MRZ SATIRI",
         "BIOMETRIC_NOTICE": "BİYOMETRİK VERİ"
     }
@@ -123,9 +135,29 @@ def _mask_value(value: str, entity_type: str, mode: str = "starred") -> str:
     elif entity_type == "API_KEY":
         return f"{val[:6]}*******************"
         
-    elif entity_type in ("BIRTH_DATE", "SERIAL_NO", "LICENSE_PLATE", "PARENTS_NAME", "ADDRESS", "MRZ", "BIOMETRIC_NOTICE"):
+    elif entity_type == "DOCUMENT_NUMBER":
+        # A123456789 → A*****89
+        return f"{val[0]}*****{val[-2:]}" if len(val) >= 4 else "***"
+
+    elif entity_type == "EXPIRY_DATE":
+        # Tarih kısmını maskele, etiket kelimelerini bırak
+        return re.sub(r'\d{2}[\.\/\-]\d{2}[\.\/\-]\d{4}', '**.**.**.**', val)
+
+    elif entity_type == "FULL_NAME":
+        words = val.split()
+        masked_words = [f"{w[0]}***" if len(w) > 1 else "*" for w in words]
+        return " ".join(masked_words)
+
+    elif entity_type == "SOCIAL_PROFILE":
+        # Sadece kullanıcı adı kısmını maskele
+        parts = val.rsplit('/', 1)
+        if len(parts) == 2:
+            return f"{parts[0]}/***"
+        return "***"
+
+    elif entity_type in ("BIRTH_DATE", "SERIAL_NO", "LICENSE_PLATE", "PARENTS_NAME", "ADDRESS", "MRZ", "BIOMETRIC_NOTICE", "GENDER", "NATIONALITY"):
         return f"{val[0]}***{val[-1]}" if len(val) >= 2 else "***"
-        
+
     return f"[{entity_type}]"
 
 
@@ -283,7 +315,7 @@ def detect_pii_entities(text: str) -> List[Dict[str, Any]]:
             "confidence_score": 0.99
         })
 
-    # 13. Biyometrik Veri İbaresı Tespiti
+    # 13. Biyometrik Veri İbaresi Tespiti
     for match in re.finditer(PATTERNS["BIOMETRIC_NOTICE"], text, re.IGNORECASE):
         entities.append({
             "type": "BIOMETRIC_NOTICE",
@@ -292,6 +324,54 @@ def detect_pii_entities(text: str) -> List[Dict[str, Any]]:
             "end": match.end(),
             "label": "Biyometrik Veri İbaresi",
             "confidence_score": 0.90
+        })
+
+    # 14. Belge Numarası Tespiti (Kimlik, Pasaport seri no)
+    for match in re.finditer(PATTERNS["DOCUMENT_NUMBER"], text):
+        if not any(e["start"] <= match.start() < e["end"] for e in entities):
+            entities.append({
+                "type": "DOCUMENT_NUMBER",
+                "text": match.group(),
+                "start": match.start(),
+                "end": match.end(),
+                "label": "Belge Numarası",
+                "confidence_score": 0.82
+            })
+
+    # 15. Geçerlilik Tarihi (Kimlik / Pasaport)
+    for match in re.finditer(PATTERNS["EXPIRY_DATE"], text, re.IGNORECASE):
+        if not any(e["start"] <= match.start() < e["end"] for e in entities):
+            entities.append({
+                "type": "EXPIRY_DATE",
+                "text": match.group(),
+                "start": match.start(),
+                "end": match.end(),
+                "label": "Geçerlilik Tarihi",
+                "confidence_score": 0.88
+            })
+
+    # 16. Ad Soyad (Kimlik belgesi etiketli)
+    for match in re.finditer(PATTERNS["FULL_NAME"], text, re.IGNORECASE):
+        name_val = match.group(1) if match.lastindex else match.group()
+        if not any(e["start"] <= match.start() < e["end"] for e in entities):
+            entities.append({
+                "type": "FULL_NAME",
+                "text": name_val,
+                "start": match.start(1) if match.lastindex else match.start(),
+                "end": match.end(1) if match.lastindex else match.end(),
+                "label": "Ad Soyad",
+                "confidence_score": 0.88
+            })
+
+    # 17. Sosyal Profil Linkleri
+    for match in re.finditer(PATTERNS["SOCIAL_PROFILE"], text, re.IGNORECASE):
+        entities.append({
+            "type": "SOCIAL_PROFILE",
+            "text": match.group(),
+            "start": match.start(),
+            "end": match.end(),
+            "label": "Sosyal Profil",
+            "confidence_score": 0.95
         })
 
     # Çakışan varlıkları filtrele ve başlangıç sırasına göre diz
@@ -306,40 +386,74 @@ def detect_pii_entities(text: str) -> List[Dict[str, Any]]:
     return unique_entities
 
 
+# PII kategorileri (KVKK Madde 6 uyumlu)
+# Özel nitelikli: Biyometrik, sağlık, ırk, din, siyasi görüş vb.
+_SPECIAL_CATEGORY_TYPES = {"BIOMETRIC_NOTICE"}
+# Kritik kişisel veri: Kimlik numarası, finans verileri, MRZ
+_CRITICAL_PERSONAL_TYPES = {"TCKN", "CREDIT_CARD", "IBAN", "API_KEY", "MRZ", "DOCUMENT_NUMBER"}
+# Genel kişisel veri: İsim, doğum tarihi, adres, telefon vb.
+_GENERAL_PERSONAL_TYPES = {
+    "EMAIL", "PHONE", "NAME", "FULL_NAME", "BIRTH_DATE",
+    "LICENSE_PLATE", "SERIAL_NO", "PARENTS_NAME", "GENDER",
+    "NATIONALITY", "ADDRESS", "EXPIRY_DATE", "SOCIAL_PROFILE", "IP_ADDRESS"
+}
+
+
 def calculate_kvkk_report(entities: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
     Tespit edilen kişisel verilerin türüne, sayısına ve güven skorlarına göre
     KVKK / GDPR uyumluluk ve risk raporu oluşturur.
+
+    Dil notu:
+    - "Kritik KVKK İhlali" ifadesi kaldırıldı: tespiti ihlal değil, uyarı olarak sunar.
+    - Biyometrik/özel nitelikli veri ayrımı KVKK Madde 6 ile uyumludur.
+    - Siber güvenlik verileri (IP, API key) artık ayrı etiketle gösterilir.
     """
     total = len(entities)
-    breakdown = {}
-    confidence_warnings = []
-    
+    breakdown: Dict[str, int] = {}
+    confidence_warnings: List[str] = []
+
     for ent in entities:
         t = ent["type"]
         breakdown[t] = breakdown.get(t, 0) + 1
         score = ent.get("confidence_score", 1.0)
         if score < 0.85:
-            confidence_warnings.append(f"Düşük güven skorlu PII tespiti ({ent.get('label')}: {ent.get('text')})")
+            confidence_warnings.append(
+                f"Düşük güven skorlu tespit ({ent.get('label')}: {ent.get('text')})"
+            )
 
-    has_critical = any(t in breakdown for t in ["TCKN", "CREDIT_CARD", "IBAN", "API_KEY", "MRZ", "BIOMETRIC_NOTICE"])
-    
+    has_special   = any(t in breakdown for t in _SPECIAL_CATEGORY_TYPES)
+    has_critical  = any(t in breakdown for t in _CRITICAL_PERSONAL_TYPES)
+    has_general   = any(t in breakdown for t in _GENERAL_PERSONAL_TYPES)
+
     if total == 0:
-        status = "🛡️ Güvenli (Hassas Kişisel Veri Tespit Edilmedi)"
+        status = "🛡️ Kişisel Veri Tespit Edilmedi"
+        kvkk_risk_label = "Düşük Risk"
         risk_level = "Low"
-    elif has_critical:
-        status = f"🚨 Kritik KVKK İhlali ({total} Hassas Veri Bulundu: TCKN/Finans/Siber/Biyometrik)"
+    elif has_special:
+        status = f"🔴 Özel Nitelikli Kişisel Veri İçeriyor ({total} varlık)"
+        kvkk_risk_label = "Kritik — KVKK Madde 6"
         risk_level = "High"
-    else:
-        status = f"⚠️ Dikkat ({total} Kişisel Veri Tespit Edildi)"
+    elif has_critical:
+        status = f"🟠 Kritik Kişisel Veri Tespit Edildi ({total} varlık)"
+        kvkk_risk_label = "Yüksek Risk"
+        risk_level = "High"
+    elif has_general:
+        status = f"🟡 Kişisel Veri Tespit Edildi ({total} varlık)"
+        kvkk_risk_label = "Orta Risk"
         risk_level = "Medium"
+    else:
+        status = f"🔵 Kişisel Veri Tespit Edildi ({total} varlık)"
+        kvkk_risk_label = "Düşük Risk"
+        risk_level = "Low"
 
     return {
         "status": status,
+        "kvkk_risk_label": kvkk_risk_label,
         "risk_level": risk_level,
         "total_entities": total,
         "breakdown": breakdown,
-        "confidence_warnings": confidence_warnings
+        "confidence_warnings": confidence_warnings,
     }
 
 

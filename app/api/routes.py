@@ -17,13 +17,13 @@ from app.utils.text_cleaner import clean_text
 from app.utils.language_detector import detect_language, get_language_label
 from app.services.summary_service import generate_summary
 from app.services.keyword_service import extract_keywords
-from app.services.category_service import predict_category
+from app.services.category_service import predict_category, get_category_label
 from app.services.risk_service import analyze_risk
 from app.services.pdf_service import extract_text_from_pdf
 from app.services.ocr_service import extract_text_from_image_bytes
 from app.services.llm_service import translate_text
 from app.services.rag_service import generate_rag_answer
-from app.services.ner_service import mask_pii_text
+from app.services.ner_service import mask_pii_text, detect_pii_entities
 
 from app.services.anomaly_service import detect_document_anomalies
 from app.services.recommendation_service import generate_action_recommendations
@@ -62,23 +62,29 @@ def process_text_pipeline(
         raise HTTPException(status_code=400, detail="Metin içeriği geçerli karakter barındırmıyor.")
 
     try:
-        # Faz 3: KVKK & Kişisel Veri Maskeleme (Privacy by Design: Önce maskeleme yapılır)
+        # Faz 3: KVKK & Kişisel Veri Maskeleme (Privacy by Design)
         masked_txt, entity_dicts, kvkk_dict = mask_pii_text(cleaned_text, mask_mode="starred")
         
         lang_code = req_language if req_language and req_language.strip() else detect_language(cleaned_text)
         lang_label = get_language_label(lang_code)
         
-        # LLM ve Özet motoruna doğrudan maskelenmiş güvenli metin gönderilir (Sıfır Veri Sızıntısı)
+        # LLM ve Özet motoruna maskelenmiş metin gönderilir
         raw_summary = generate_summary(masked_txt, language=lang_code)
         
-        # Çıktı özetini de her ihtimale karşı PII filtresinden geçir (Çift Katmanlı Koruma)
+        # Çıktı özetini de PII filtresinden geçir (Çift Katmanlı Koruma)
         summary, _, _ = mask_pii_text(raw_summary, mask_mode="starred")
         
         keywords = extract_keywords(masked_txt, language=lang_code)
-        category = predict_category(masked_txt)
-        risk_data = analyze_risk(cleaned_text)
+        category = predict_category(cleaned_text)  # Ham metin üzerinde kategori tespiti
+        category_lbl = get_category_label(category)
 
-        
+        # Üç boyutlu risk: PII varlıkları risk motoruna iletiliyor
+        risk_data = analyze_risk(
+            text=cleaned_text,
+            category=category,
+            pii_entities=entity_dicts,
+        )
+
         pii_entities = [
             PIIEntity(
                 type=e["type"],
@@ -95,10 +101,28 @@ def process_text_pipeline(
         kvkk_rep = KVKKReport(
             status=kvkk_dict["status"],
             risk_level=kvkk_dict["risk_level"],
+            kvkk_risk_label=kvkk_dict.get("kvkk_risk_label"),
             total_entities=kvkk_dict["total_entities"],
             breakdown=kvkk_dict["breakdown"],
             confidence_warnings=kvkk_dict.get("confidence_warnings", [])
         )
+
+        # ── Maskeleme Sonrası İkinci PII Tarama (Residual Scan) ────────────────
+        residual_entities = detect_pii_entities(masked_txt)
+        detected_count = len(entity_dicts)
+        residual_count = len(residual_entities)
+        masked_count = max(0, detected_count - residual_count)
+        coverage = round((masked_count / detected_count * 100), 1) if detected_count > 0 else 100.0
+        redaction_verification = {
+            "detected": detected_count,
+            "masked": masked_count,
+            "residual": residual_count,
+            "coverage_percent": coverage,
+            "status": "VERIFIED" if residual_count == 0 else "INCOMPLETE",
+            "residual_entities": [
+                {"type": r["type"], "label": r["label"]} for r in residual_entities
+            ],
+        }
 
         # Faz 5: Anomali & Sahtecilik Tespiti
         anomaly_rep = detect_document_anomalies(cleaned_text, category=category)
@@ -125,8 +149,10 @@ def process_text_pipeline(
             summary=summary,
             keywords=keywords,
             category=category,
+            category_label=category_lbl,
             risk_level=risk_data["risk_level"],
             risk_score=risk_data["risk_score"],
+            risk_breakdown=risk_data.get("risk_breakdown"),
             language=lang_code,
             language_label=lang_label,
             extraction_method=extraction_method,
@@ -137,7 +163,8 @@ def process_text_pipeline(
             kvkk_report=kvkk_rep,
             anomaly_report=anomaly_rep,
             recommendations=recs,
-            cv_analysis=cv_info if cv_info.get("is_cv") else None
+            cv_analysis=cv_info if cv_info.get("is_cv") else None,
+            redaction_verification=redaction_verification,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analiz sırasında bir sunucu hatası oluştu: {str(e)}")

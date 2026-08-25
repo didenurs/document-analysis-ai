@@ -59,10 +59,10 @@ def test_contextual_risk_engine_mitigators():
     active_risk = analyze_risk(active_attack_text)
 
     assert hist_risk["is_mitigated"] is True
-    assert hist_risk["risk_level"] in ("Low", "Medium")
+    assert hist_risk["risk_level"].upper() in ("LOW", "MEDIUM")
     assert "Tarihi" in hist_risk["incident_status"]
 
-    assert active_risk["risk_level"] == "High"
+    assert active_risk["risk_level"].upper() in ("HIGH", "CRITICAL")
     assert "Aktif" in active_risk["incident_status"]
 
 def test_cv_document_intelligence():
@@ -79,3 +79,90 @@ def test_cv_document_intelligence():
     assert "Python" in result["detected_tech_stack"]
     assert "Spark" in result["detected_tech_stack"]
     assert "Veri Mühendisliği" in result["specialization"]
+
+
+# ─────────────────────────────────────────────────────────────────
+# P0 Yeni Testler — Bölüm 1 Doğrulama
+# ─────────────────────────────────────────────────────────────────
+
+def test_identity_card_classification():
+    """Kimlik kartı dokümanı artık 'Literature & Arts' değil 'IDENTITY_CARD' olmalı."""
+    from app.services.category_service import predict_category, get_category_label
+    id_card_text = """
+    TÜRKİYE CUMHURİYETİ KİMLİK KARTI
+    Soyad / Surname: YILMAZ
+    Ad / Given Name: AHMET
+    Doğum Tarihi / Date of Birth: 01.01.1990
+    Belge No / Document No: A12345678
+    T.C. Kimlik No: 12345678901
+    Geçerlilik / Validity: 01.01.2030
+    """
+    cat = predict_category(id_card_text)
+    assert cat == "IDENTITY_CARD", f"Kimlik kartı IDENTITY_CARD olmalı, '{cat}' döndü"
+    lbl = get_category_label(cat)
+    assert "Kimlik" in lbl or "Pasaport" in lbl, f"Label kimlik içermeli: {lbl}"
+
+
+def test_resume_classification():
+    """CV / Özgeçmiş RESUME_CV olarak sınıflandırılmalı."""
+    from app.services.category_service import predict_category
+    cv_text = """
+    ÖZGEÇMİŞ — CURRICULUM VITAE
+    Professional Summary: 5 years experience in data engineering.
+    Work Experience: Senior Data Engineer at TechCorp (2020-2025)
+    Technical Skills: Python, Apache Spark, PostgreSQL, Docker
+    Education: Boğaziçi Üniversitesi, Bilgisayar Mühendisliği
+    """
+    cat = predict_category(cv_text)
+    assert cat == "RESUME_CV", f"CV RESUME_CV olmalı, '{cat}' döndü"
+
+
+def test_multidimensional_risk_identity_card():
+    """Kimlik kartı için gizlilik riski CRITICAL, güvenlik tehdidi LOW olmalı."""
+    from app.services.risk_service import analyze_risk_multidimensional
+    id_text = "T.C. Kimlik No: 12345678901, Ad: Ahmet Yılmaz, Doğum: 01.01.1990"
+    pii = [{"type": "TCKN"}, {"type": "BIRTH_DATE"}, {"type": "FULL_NAME"}]
+    result = analyze_risk_multidimensional(id_text, category="IDENTITY_CARD", pii_entities=pii)
+    assert result["privacy_exposure"]["level"] in ("HIGH", "CRITICAL"), \
+        f"ID kartı gizlilik riski yüksek olmalı: {result['privacy_exposure']}"
+    assert result["security_threat"]["level"] in ("LOW", "MEDIUM"), \
+        f"ID kartı güvenlik tehdidi düşük olmalı: {result['security_threat']}"
+
+
+def test_kvkk_report_no_kritik_ihlal_language():
+    """KVKK raporu artık 'Kritik KVKK İhlali' değil, doğru dil kullanmalı."""
+    from app.services.ner_service import calculate_kvkk_report
+    # Kritik PII varlıkları ile test
+    entities = [{"type": "TCKN", "label": "TCKN", "text": "12345678901", "confidence_score": 0.98}]
+    report = calculate_kvkk_report(entities)
+    assert "Kritik KVKK İhlali" not in report["status"], \
+        f"Eski 'Kritik KVKK İhlali' dili kullanılmamalı: {report['status']}"
+    assert "kvkk_risk_label" in report, "kvkk_risk_label alanı eksik"
+    assert report["total_entities"] == 1
+
+
+def test_residual_scan_in_pipeline():
+    """Routes pipeline artık redaction_verification dönmeli."""
+    from fastapi.testclient import TestClient
+    from app.main import app
+    c = TestClient(app)
+    payload = {"text": "TC Kimlik No: 12345678901, E-posta: test@example.com"}
+    resp = c.post("/analyze-text", json=payload)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "redaction_verification" in data, "redaction_verification eksik"
+    rv = data["redaction_verification"]
+    assert "detected" in rv
+    assert "masked" in rv
+    assert "residual" in rv
+    assert "status" in rv
+    assert rv["status"] in ("VERIFIED", "INCOMPLETE")
+
+
+def test_new_pii_social_profile():
+    """Sosyal profil linkleri SOCIAL_PROFILE olarak tespit edilmeli."""
+    from app.services.ner_service import detect_pii_entities
+    text = "Profilim: linkedin.com/in/ahmetyilmaz veya github.com/ahmet123 adresinden ulaşabilirsiniz."
+    entities = detect_pii_entities(text)
+    types = [e["type"] for e in entities]
+    assert "SOCIAL_PROFILE" in types, f"linkedin/github SOCIAL_PROFILE olmalı. Bulunanlar: {types}"

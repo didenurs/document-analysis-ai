@@ -17,6 +17,7 @@ class PIIEntity(BaseModel):
 class KVKKReport(BaseModel):
     status: str
     risk_level: str
+    kvkk_risk_label: Optional[str] = None  # "Özel Nitelikli / Yüksek / Orta / Düşük"
     total_entities: int
     breakdown: Dict[str, int]
     confidence_warnings: Optional[List[str]] = []
@@ -37,8 +38,10 @@ class AnalysisResponse(BaseModel):
     summary: str
     keywords: List[str]
     category: str
+    category_label: Optional[str] = None       # İnsan okunabilir Türkçe etiket
     risk_level: str
     risk_score: int
+    risk_breakdown: Optional[Dict[str, Any]] = None   # Üç boyutlu risk (security/privacy/sensitive)
     language: Optional[str] = "en"
     language_label: Optional[str] = "English"
     extraction_method: Optional[str] = "text"
@@ -50,6 +53,7 @@ class AnalysisResponse(BaseModel):
     anomaly_report: Optional[AnomalyReport] = None
     recommendations: Optional[List[ActionItem]] = []
     cv_analysis: Optional[Dict[str, Any]] = None
+    redaction_verification: Optional[Dict[str, Any]] = None  # Maskeleme sonrası ikinci tarama
 
 
 class TranslationRequest(BaseModel):
