@@ -336,3 +336,100 @@ def test_end_to_end_pipeline_structured_response():
     assert "visual_pii" in data
     assert len(data["visual_pii"]) > 0
 
+
+# ─────────────────────────────────────────────────────────────────
+# Bölüm 3 (P2) Yeni Testler — HTML Report ID, Verification Badge & Exports
+# ─────────────────────────────────────────────────────────────────
+
+def test_html_report_generation_with_report_id_and_badges():
+    """HTML raporunun Report ID, Engine Sürümü, Doğrulama Rozeti ve 3D Risk içermesi."""
+    from app.services.export_service import generate_html_report
+    
+    mock_data = {
+        "summary": "Bu bir örnek doküman özetidir.",
+        "category": "IDENTITY_CARD",
+        "category_label": "Kimlik / Pasaport Belgesi",
+        "risk_level": "High",
+        "risk_score": 75,
+        "risk_breakdown": {
+            "security_threat": {"score": 10, "level": "LOW"},
+            "privacy_exposure": {"score": 85, "level": "CRITICAL"},
+            "sensitive_data": {"score": 60, "level": "HIGH"}
+        },
+        "language_label": "Türkçe",
+        "extraction_method": "Metin",
+        "keywords": ["kimlik", "güvenlik", "doğrulama"],
+        "kvkk_report": {
+            "status": "Kişisel Veri Tespit Edildi — Maskeleme Gerekli",
+            "risk_level": "High",
+            "total_entities": 3
+        },
+        "redaction_verification": {
+            "status": "VERIFIED",
+            "detected": 3,
+            "masked": 3,
+            "residual": 0,
+            "coverage_percent": 100.0
+        },
+        "structured_data": {
+            "tckn": "12345678901",
+            "surname": "YILMAZ",
+            "given_name": "AHMET"
+        },
+        "mrz_data": {
+            "is_checksum_valid": True,
+            "raw_lines": ["I<TURA12B345674<<<<<<<<<<<<<<<", "9001018M3001014TUR123456789012"]
+        },
+        "visual_pii": [
+            {"type": "BIOMETRIC_PHOTO", "label": "📸 Biyometrik Fotoğraf"}
+        ],
+        "masked_text": "T.C. Kimlik No: [TCKN_MASKELENDİ], Soyadı: [SOYAD_MASKELENDİ]"
+    }
+    
+    html = generate_html_report(mock_data)
+    assert "DOC-" in html, "Report ID bulunamadı"
+    assert "v2.5-intelligence" in html, "Engine versiyonu bulunamadı"
+    assert "Maskeleme Doğrulandı" in html or "VERIFIED" in html, "Verification badge bulunamadı"
+    assert "GİZLİLİK / PII RİSKİ" in html, "Gizlilik riski kutusu bulunamadı"
+    assert "GÜVENLİK TEHDİDİ" in html, "Güvenlik tehdidi kutusu bulunamadı"
+    assert "YILMAZ" in html, "Yapılandırılmış alanlar bulunamadı"
+    assert "I<TURA12B345674" in html, "MRZ satırı bulunamadı"
+    assert "Biyometrik Fotoğraf" in html, "Görsel PII etiketi bulunamadı"
+
+
+def test_export_endpoints_post():
+    """Export /export/json, /export/csv, /export/html, /export/masked-pdf uç noktaları."""
+    from fastapi.testclient import TestClient
+    from app.main import app
+    
+    c = TestClient(app)
+    mock_payload = {
+        "analysis_data": {
+            "summary": "Finansal rapor özeti.",
+            "category": "FINANCIAL_REPORT",
+            "risk_level": "Low",
+            "risk_score": 10,
+            "masked_text": "Gelir tablosu [MASKELENDİ] TL olarak açıklanmıştır."
+        },
+        "export_format": "json"
+    }
+    
+    # 1. JSON Export
+    resp_json = c.post("/export/json", json=mock_payload)
+    assert resp_json.status_code == 200
+    assert "Finansal rapor özeti" in resp_json.text
+    
+    # 2. HTML Export
+    mock_payload["export_format"] = "html"
+    resp_html = c.post("/export/html", json=mock_payload)
+    assert resp_html.status_code == 200
+    assert "DOC-" in resp_html.text
+    
+    # 3. Masked PDF Export
+    mock_payload["export_format"] = "masked-pdf"
+    resp_pdf = c.post("/export/masked-pdf", json=mock_payload)
+    assert resp_pdf.status_code == 200
+    assert resp_pdf.headers["content-type"] == "application/pdf"
+    assert len(resp_pdf.content) > 100
+
+

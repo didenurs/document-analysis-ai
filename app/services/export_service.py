@@ -194,10 +194,19 @@ def generate_csv_bytes(data: Dict[str, Any]) -> bytes:
     return output.getvalue().encode('utf-8-sig')  # Excel için UTF-8 BOM ile yazılır
 
 def generate_html_report(data: Dict[str, Any]) -> str:
-    """Analiz verileri için yazdırılabilir (PDF-ready) şık bir HTML raporu oluşturur."""
+    """
+    Analiz verileri için yazdırılabilir (print-ready) profesyonel HTML raporu oluşturur.
+    Rapor Kimliği (Report ID), Sürüm, Doğrulama Rozeti, 3 Boyutlu Risk ve Yapılandırılmış Verileri içerir.
+    """
+    import uuid
+    from datetime import datetime
+
     is_batch = "documents" in data
+    report_id = f"DOC-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
+    timestamp_str = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+    engine_version = "v2.5-intelligence"
     
-    title = "Toplu Doküman Analiz Raporu" if is_batch else "Doküman Analiz & Risk Raporu"
+    title = "Toplu Doküman Analiz Raporu" if is_batch else "Doküman Analiz & KVKK Uyumluluk Raporu"
     
     if is_batch:
         summary_html = f"<div class='box'><div class='box-title'>📊 Genel Birleşik Özet</div><p>{data.get('overall_summary', '')}</p></div>"
@@ -211,7 +220,7 @@ def generate_html_report(data: Dict[str, Any]) -> str:
             docs_table_rows += f"""
             <tr>
                 <td><strong>{doc.get('filename', '')}</strong></td>
-                <td>{a.get('category', '')}</td>
+                <td>{a.get('category_label') or a.get('category', '')}</td>
                 <td><span class='badge risk-{a.get('risk_level', 'low').lower()}'>{a.get('risk_level', '')} ({a.get('risk_score', 0)})</span></td>
                 <td>{a.get('summary', '')[:120]}...</td>
             </tr>
@@ -219,7 +228,7 @@ def generate_html_report(data: Dict[str, Any]) -> str:
             
         extra_content = f"""
         <div class='box'>
-            <div class='box-title'>📂 Analiz Edilen Dokümanlar ({data.get('total_documents', 0)})</div>
+            <div class='box-title'>📂 Analiz Edilen Dokümanlar ({data.get('total_documents', 0)} Adet)</div>
             <table>
                 <thead>
                     <tr>
@@ -235,11 +244,78 @@ def generate_html_report(data: Dict[str, Any]) -> str:
             </table>
         </div>
         """
+        three_d_risk_html = ""
+        structured_html = ""
     else:
-        summary_html = f"<div class='box'><div class='box-title'>✨ Yapay Zekâ Özeti</div><p>{data.get('summary', '')}</p></div>"
+        summary_html = f"<div class='box'><div class='box-title'>✨ Yapay Zekâ Doküman Özeti</div><p style='line-height: 1.6;'>{data.get('summary', '')}</p></div>"
         risk_score = data.get('risk_score', 0)
         risk_level = data.get('risk_level', 'Low')
         kvkk = data.get('kvkk_report', {})
+        
+        # 3 Boyutlu Risk Kartları
+        rb = data.get("risk_breakdown", {})
+        sec = rb.get("security_threat", {"score": 0, "level": "LOW"})
+        priv = rb.get("privacy_exposure", {"score": 0, "level": "LOW"})
+        sens = rb.get("sensitive_data", {"score": 0, "level": "LOW"})
+        
+        three_d_risk_html = f"""
+        <div class='box'>
+            <div class='box-title'>🎯 3 Boyutlu Risk Değerlendirmesi</div>
+            <div style='display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 10px;'>
+                <div style='background: #020617; padding: 12px; border-radius: 8px; border: 1px solid #1e293b;'>
+                    <div style='font-size: 11px; color: #94a3b8; font-weight: bold;'>🔐 GİZLİLİK / PII RİSKİ</div>
+                    <div style='font-size: 16px; font-weight: bold; color: #f43f5e; margin-top: 4px;'>{priv.get('level', 'LOW')} ({priv.get('score', 0)}/100)</div>
+                </div>
+                <div style='background: #020617; padding: 12px; border-radius: 8px; border: 1px solid #1e293b;'>
+                    <div style='font-size: 11px; color: #94a3b8; font-weight: bold;'>🛡️ GÜVENLİK TEHDİDİ</div>
+                    <div style='font-size: 16px; font-weight: bold; color: #38bdf8; margin-top: 4px;'>{sec.get('level', 'LOW')} ({sec.get('score', 0)}/100)</div>
+                </div>
+                <div style='background: #020617; padding: 12px; border-radius: 8px; border: 1px solid #1e293b;'>
+                    <div style='font-size: 11px; color: #94a3b8; font-weight: bold;'>🧬 HASSAS / ÖZEL NİTELİKLİ</div>
+                    <div style='font-size: 16px; font-weight: bold; color: #c084fc; margin-top: 4px;'>{sens.get('level', 'LOW')} ({sens.get('score', 0)}/100)</div>
+                </div>
+            </div>
+        </div>
+        """
+        
+        # Yapılandırılmış Doküman Alanları ve MRZ
+        struct = data.get("structured_data") or {}
+        mrz = data.get("mrz_data")
+        visual_pii = data.get("visual_pii") or []
+        
+        structured_items_html = ""
+        if struct:
+            for k, v in struct.items():
+                if v:
+                    structured_items_html += f"<div style='background: #020617; padding: 8px 12px; border-radius: 6px; border: 1px solid #1e293b;'><span style='font-size: 10px; color: #94a3b8; display: block;'>{k.upper()}</span><span style='font-family: monospace; font-size: 12px; color: #38bdf8;'>{v}</span></div>"
+                    
+        mrz_html = ""
+        if mrz:
+            raw_mrz = "<br>".join(mrz.get("raw_lines", []))
+            mrz_status = "✅ ICAO Doc 9303 Doğrulandı" if mrz.get("is_checksum_valid") else "⚠️ Checksum Kontrolü Yapıldı"
+            mrz_html = f"""
+            <div style='margin-top: 12px; padding: 10px; background: #020617; border-radius: 6px; border: 1px solid #1e293b;'>
+                <div style='display: flex; justify-content: space-between; margin-bottom: 6px;'>
+                    <span style='font-size: 11px; font-weight: bold; color: #94a3b8;'>📟 MRZ (Makine Okunabilir Alan)</span>
+                    <span style='font-size: 10px; font-weight: bold; color: #10b981;'>{mrz_status}</span>
+                </div>
+                <div style='font-family: monospace; font-size: 11px; color: #34d399;'>{raw_mrz}</div>
+            </div>
+            """
+            
+        visual_pii_html = ""
+        if visual_pii:
+            v_badges = "".join([f"<span style='display: inline-block; background: #581c87; color: #d8b4fe; padding: 3px 8px; border-radius: 4px; font-size: 11px; margin-right: 6px;'>{v.get('label', v.get('type'))}</span>" for v in visual_pii])
+            visual_pii_html = f"<div style='margin-top: 10px;'><span style='font-size: 11px; color: #94a3b8; display: block; margin-bottom: 4px;'>Görsel/Biyometrik PII Unsurları:</span>{v_badges}</div>"
+            
+        structured_html = f"""
+        <div class='box'>
+            <div class='box-title'>🪪 Yapılandırılmış Doküman Verisi</div>
+            <div style='display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px;'>{structured_items_html}</div>
+            {mrz_html}
+            {visual_pii_html}
+        </div>
+        """ if (struct or mrz or visual_pii) else ""
         
         keywords_html = "".join([f"<span class='tag'>#{kw}</span>" for kw in data.get('keywords', [])])
         
@@ -251,10 +327,12 @@ def generate_html_report(data: Dict[str, Any]) -> str:
         </div>
         """ if masked_doc else ""
 
+        category_display = data.get('category_label') or data.get('category', 'Genel')
+
         extra_content = f"""
         <div class='box'>
-            <div class='box-title'>📁 Kategori & Metadata</div>
-            <p><strong>Belge Kategorisi:</strong> {data.get('category', 'Genel')}</p>
+            <div class='box-title'>📁 Kategori & Meta Veriler</div>
+            <p><strong>Doküman Tipi:</strong> {category_display}</p>
             <p><strong>Tespit Edilen Dil:</strong> {data.get('language_label', 'Türkçe')}</p>
             <p><strong>Çıkarma Yöntemi:</strong> {data.get('extraction_method', 'Metin')}</p>
         </div>
@@ -262,10 +340,21 @@ def generate_html_report(data: Dict[str, Any]) -> str:
             <div class='box-title'>🔑 Anahtar İfadeler</div>
             <div>{keywords_html or 'Yok'}</div>
         </div>
+        {three_d_risk_html}
+        {structured_html}
         {masked_box_html}
         """
 
-    risk_badge_class = f"risk-{risk_level.lower()}"
+    # Doğrulama Rozeti (Redaction Verification)
+    rv = data.get("redaction_verification", {})
+    if rv.get("status") == "VERIFIED":
+        verification_badge_html = f"<div style='background: #064e3b; border: 1px solid #10b981; color: #a7f3d0; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: bold; display: inline-flex; align-items: center; gap: 6px;'><span>✅</span> <span>Maskeleme Doğrulandı (0 Artık PII / %{rv.get('coverage_percent', 100)} Kapsama)</span></div>"
+    elif rv.get("status") == "INCOMPLETE":
+        verification_badge_html = f"<div style='background: #78350f; border: 1px solid #f59e0b; color: #fde68a; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: bold; display: inline-flex; align-items: center; gap: 6px;'><span>⚠️</span> <span>Maskeleme Eksik ({rv.get('residual', 0)} artık PII)</span></div>"
+    else:
+        verification_badge_html = "<div style='background: #0f172a; border: 1px solid #334155; color: #94a3b8; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: bold;'>🛡️ Doküman Analiz Edildi</div>"
+
+    risk_badge_class = f"risk-{str(risk_level).lower()}"
     kvkk_status = kvkk.get("status", "GÜVENLİ") if kvkk else "GÜVENLİ"
     kvkk_count = kvkk.get("total_entities", 0) if kvkk else 0
 
@@ -273,65 +362,73 @@ def generate_html_report(data: Dict[str, Any]) -> str:
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>{title} - Doc Analysis AI</title>
+    <title>{title} - {report_id}</title>
     <style>
         body {{
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #0f172a;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #0b1329;
             color: #f8fafc;
             margin: 0;
-            padding: 40px;
+            padding: 30px 20px;
         }}
         .container {{
             max-width: 900px;
             margin: 0 auto;
-            background-color: #1e293b;
+            background-color: #111e38;
             border-radius: 16px;
             padding: 32px;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
-            border: 1px solid #334155;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+            border: 1px solid #1e293b;
         }}
         .header {{
-            border-bottom: 2px solid #334155;
+            border-bottom: 2px solid #1e293b;
             padding-bottom: 20px;
             margin-bottom: 24px;
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 12px;
         }}
         h1 {{
             color: #38bdf8;
-            margin: 0;
-            font-size: 24px;
+            margin: 0 0 4px 0;
+            font-size: 22px;
+            font-weight: 800;
+        }}
+        .meta-text {{
+            color: #94a3b8;
+            font-size: 11px;
+            font-family: Consolas, Monaco, monospace;
         }}
         .badge {{
             padding: 6px 14px;
             border-radius: 20px;
             font-weight: bold;
-            font-size: 13px;
+            font-size: 12px;
             display: inline-block;
         }}
-        .risk-high {{ background-color: #7f1d1d; color: #fca5a5; border: 1px solid #ef4444; }}
+        .risk-critical, .risk-high {{ background-color: #7f1d1d; color: #fca5a5; border: 1px solid #ef4444; }}
         .risk-medium {{ background-color: #78350f; color: #fde047; border: 1px solid #eab308; }}
-        .risk-low {{ background-color: #14532d; color: #86efac; border: 1px solid #22c55e; }}
+        .risk-low, .risk-clean {{ background-color: #14532d; color: #86efac; border: 1px solid #22c55e; }}
         .box {{
-            background-color: #0f172a;
+            background-color: #0b1329;
             border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-            border: 1px solid #334155;
+            padding: 18px;
+            margin-bottom: 18px;
+            border: 1px solid #1e293b;
         }}
         .box-title {{
-            font-size: 14px;
-            font-weight: bold;
-            color: #94a3b8;
+            font-size: 13px;
+            font-weight: 700;
+            color: #38bdf8;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             margin-bottom: 10px;
         }}
         .tag {{
             display: inline-block;
-            background: #334155;
+            background: #1e293b;
             color: #38bdf8;
             padding: 4px 10px;
             border-radius: 6px;
@@ -339,6 +436,7 @@ def generate_html_report(data: Dict[str, Any]) -> str:
             margin-bottom: 6px;
             font-size: 12px;
             font-weight: 600;
+            border: 1px solid #334155;
         }}
         table {{
             width: 100%;
@@ -348,12 +446,12 @@ def generate_html_report(data: Dict[str, Any]) -> str:
         th, td {{
             padding: 10px 12px;
             text-align: left;
-            border-bottom: 1px solid #334155;
+            border-bottom: 1px solid #1e293b;
             font-size: 13px;
         }}
         th {{
             color: #94a3b8;
-            background-color: #1e293b;
+            background-color: #111e38;
         }}
     </style>
 </head>
@@ -361,11 +459,12 @@ def generate_html_report(data: Dict[str, Any]) -> str:
     <div class="container">
         <div class="header">
             <div>
-                <h1>🤖 Doc Analysis AI - {title}</h1>
-                <p style="color: #94a3b8; font-size: 12px; margin-top: 4px;">Oluşturulma Tarihi: Raporlama Motoru</p>
+                <h1>🛡️ Doc Analysis AI — {title}</h1>
+                <div class="meta-text">Rapor No: <b>{report_id}</b> | Tarih: {timestamp_str} | Motor: {engine_version}</div>
             </div>
-            <div>
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
                 <span class="badge {risk_badge_class}">Güvenlik Riski: {risk_level} ({risk_score}/100)</span>
+                {verification_badge_html}
             </div>
         </div>
         
@@ -379,10 +478,11 @@ def generate_html_report(data: Dict[str, Any]) -> str:
         
         {extra_content}
         
-        <div style="text-align: center; margin-top: 30px; font-size: 11px; color: #64748b;">
-            Doc Analysis AI - Otomatik Oluşturulan Analiz & KVKK Raporudur.
+        <div style="text-align: center; margin-top: 30px; font-size: 11px; color: #64748b; border-top: 1px solid #1e293b; padding-top: 15px;">
+            Doc Analysis AI ({engine_version}) — Otomatik Doğrulanmış Doküman Zekası & KVKK Raporu | Rapor No: {report_id}
         </div>
     </div>
 </body>
 </html>"""
     return html
+

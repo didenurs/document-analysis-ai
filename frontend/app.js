@@ -1025,10 +1025,13 @@ function displayResults(data, autoScrollToMasked = false) {
                             <span>🔒</span> İşlenmiş Doküman Metni (PII Maskeli)
                         </span>
                     </div>
-                    <div class="flex gap-2">
+                    <div class="flex flex-wrap gap-1.5">
                         <button id="toggle-mask-btn" onclick="toggleMaskedTextView()" class="text-xs font-semibold px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:bg-amber-500/30 transition">👁️ Orijinal Metni Gör</button>
-                        <button id="copy-masked-btn" onclick="copyMaskedDocument()" class="text-xs font-bold px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition shadow shadow-emerald-600/30 flex items-center gap-1">
+                        <button id="copy-masked-btn" onclick="copyMaskedDocument()" class="text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition shadow shadow-emerald-600/30 flex items-center gap-1">
                             📋 Metni Kopyala
+                        </button>
+                        <button id="download-masked-pdf-btn" onclick="downloadExport('masked-pdf')" class="text-xs font-bold px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition shadow shadow-blue-600/30 flex items-center gap-1">
+                            📥 Maskelenmiş PDF İndir
                         </button>
                     </div>
                 </div>
