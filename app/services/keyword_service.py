@@ -20,16 +20,61 @@ MULTILINGUAL_STOPWORDS_LIST = [
     "saat", "sularında", "son", "derece", "yeni", "büyük", "resmi"
 ]
 
-def extract_keywords(text: str, top_n: int = 5, language: Optional[str] = None) -> List[str]:
+CATEGORY_SPECIFIC_STOPWORDS = {
+    "IDENTITY_CARD": [
+        "türkiye", "cumhuriyeti", "kimlik", "karti", "kartı", "republic", "turkey",
+        "identity", "card", "soyad", "soyadi", "soyadı", "surname", "ad", "adi", "adı",
+        "given", "name", "names", "doğum", "dogum", "tarih", "tarihi", "birth", "date",
+        "belge", "seri", "document", "validity", "geçerlilik", "gecerlilik", "valid",
+        "until", "cinsiyet", "cinsiyeti", "sex", "gender", "uyruk", "uyruğu", "uyrugu",
+        "nationality", "nüfus", "nufus", "cüzdanı", "cuzdani", "anne", "baba", "mother",
+        "father", "imza", "signature", "kan", "grubu", "blood", "group", "mrz"
+    ],
+    "RESUME_CV": [
+        "özgeçmiş", "ozgecmis", "curriculum", "vitae", "resume", "cv", "deneyim",
+        "deneyimi", "experience", "work", "eğitim", "egitim", "education", "beceri",
+        "beceriler", "skills", "profil", "profili", "summary", "tarih", "iletişim",
+        "iletisim", "contact", "telefon", "email", "mail", "adres", "address", "proje",
+        "projeler", "projects", "referans", "references", "sertifika", "certifications"
+    ],
+    "CONTRACT": [
+        "sözleşme", "sozlesme", "madde", "maddesi", "taraf", "taraflar", "hizmet",
+        "hüküm", "hükümleri", "imza", "tarih", "tarihinde", "agreement", "contract",
+        "clause", "party", "parties", "terms", "conditions", "işbu", "tanzim", "kabul",
+        "beyan", "taahhüt", "eder", "ederler"
+    ],
+    "INVOICE": [
+        "fatura", "invoice", "tarih", "tarihi", "date", "toplam", "total", "tutar",
+        "tutarı", "kdv", "vat", "tax", "no", "number", "numarası", "vkn", "vergi",
+        "bedel", "ödenecek", "matrah", "miktar", "birim", "fiyat", "fiyatı"
+    ],
+    "BANK_DOCUMENT": [
+        "hesap", "ekstre", "ekstresi", "statement", "bank", "banka", "iban", "swift",
+        "bic", "dekont", "bakiye", "balance", "borç", "alacak", "tutar", "işlem", "tarihi"
+    ]
+}
+
+def extract_keywords(
+    text: str, 
+    top_n: int = 5, 
+    language: Optional[str] = None,
+    category: Optional[str] = None
+) -> List[str]:
     """
-    Metinden çok dilli (Türkçe & İngilizce) en önemli semantik anahtar ifadeleri
-    yüksek hızda ve sıfır bellek yükü ile çıkarır.
+    Metinden çok dilli (Türkçe & İngilizce) ve doküman türüne duyarlı (Document-Type Aware)
+    en önemli semantik anahtar ifadeleri çıkarır. Kimlik/CV/Sözleşme şablon kelimelerini eler.
     """
     if not text or not text.strip():
         return []
         
     lang = language or detect_language(text)
-    stops = MULTILINGUAL_STOPWORDS_LIST if lang == "tr" else "english"
+    stops = list(MULTILINGUAL_STOPWORDS_LIST)
+    
+    # Doküman tipine özel şablon/etiket kelimeleri de stopword olarak ekle
+    if category and category in CATEGORY_SPECIFIC_STOPWORDS:
+        stops.extend(CATEGORY_SPECIFIC_STOPWORDS[category])
+        
+    stops_set = set(stops)
     
     try:
         # N-Gram TF-IDF Tabanlı Hızlı Anahtar Kelime Çıkarımı
@@ -37,14 +82,18 @@ def extract_keywords(text: str, top_n: int = 5, language: Optional[str] = None) 
             token_pattern=r'(?u)\b[a-zA-ZçğıöşüÇĞİÖŞÜ]{3,}\b',
             ngram_range=(1, 2),
             stop_words=stops,
-            max_features=40
+            max_features=60
         )
         tfidf = vec.fit_transform([text])
         feature_names = vec.get_feature_names_out()
         scores = tfidf.toarray()[0]
         scored_keywords = sorted(zip(feature_names, scores), key=lambda x: x[1], reverse=True)
         
-        results = [kw for kw, s in scored_keywords if len(kw.strip()) > 3][:top_n]
+        results = [
+            kw for kw, s in scored_keywords 
+            if len(kw.strip()) > 3 and kw.lower() not in stops_set
+        ][:top_n]
+        
         if results:
             return results
     except Exception:
@@ -52,11 +101,10 @@ def extract_keywords(text: str, top_n: int = 5, language: Optional[str] = None) 
         
     # Güvenli Kelime Frekansı Tabanlı Fallback
     words = re.findall(r'\b[a-zA-ZçğıöşüÇĞİÖŞÜ]{3,}\b', text.lower())
-    stop_set = set(MULTILINGUAL_STOPWORDS_LIST)
-    filtered = [w for w in words if w not in stop_set and len(w) > 3]
+    filtered = [w for w in words if w not in stops_set and len(w) > 3]
     
     if not filtered:
-        return [w for w in words if len(w) > 2][:top_n]
+        return [w for w in words if len(w) > 2 and w not in stops_set][:top_n]
         
     counts = Counter(filtered)
     return [word for word, _ in counts.most_common(top_n)]

@@ -4,7 +4,7 @@ import base64
 import logging
 import shutil
 import httpx
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Dict, Any, Union
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_VISION_MODEL = os.getenv("GROQ_VISION_MODEL", "llama-3.2-11b-vision-preview")
 
-# Tesseract Windows ve Linux standart yollarını otomatik tespit et
 def _configure_tesseract():
     try:
         import pytesseract
@@ -48,6 +47,50 @@ def _is_groq_vision_available() -> bool:
     vision_model = os.getenv("GROQ_VISION_MODEL", "").strip()
     return bool(api_key and api_key != "your_groq_api_key_here" and enabled and vision_model)
 
+def preprocess_image_for_ocr(image_bytes: bytes) -> Tuple[Any, Dict[str, Any]]:
+    """
+    Görsel ön işleme hattı (Image Preprocessing Pipeline):
+    - Boyut ölçekleme (Upscaling): Düşük çözünürlüklü görselleri (genişlik < 1200px) 1.5x - 2x büyütür.
+    - Grayscale dönüşümü
+    - Kontrast ve Keskinlik artırma (Contrast & Sharpness Enhancement)
+    - Denoise / Gürültü azaltma
+    """
+    from PIL import Image, ImageEnhance
+    
+    image = Image.open(io.BytesIO(image_bytes))
+    orig_w, orig_h = image.size
+    
+    metadata = {
+        "original_width": orig_w,
+        "original_height": orig_h,
+        "preprocessed": True,
+        "scale_factor": 1.0
+    }
+    
+    # 1. Küçük görselleri büyüt (OCR doğruluğu için 1200px+ ideal)
+    if orig_w < 1200:
+        scale = min(2.5, 1400 / max(orig_w, 1))
+        new_w = int(orig_w * scale)
+        new_h = int(orig_h * scale)
+        resample_method = getattr(Image, 'Resampling', Image).LANCZOS
+        image = image.resize((new_w, new_h), resample_method)
+        metadata["scale_factor"] = round(scale, 2)
+        metadata["processed_width"] = new_w
+        metadata["processed_height"] = new_h
+        
+    # 2. Grayscale Dönüşümü
+    if image.mode != "L":
+        image = image.convert("L")
+        
+    # 3. Kontrast ve Keskinlik Artırma
+    contrast_enhancer = ImageEnhance.Contrast(image)
+    image = contrast_enhancer.enhance(1.6)
+    
+    sharpness_enhancer = ImageEnhance.Sharpness(image)
+    image = sharpness_enhancer.enhance(1.8)
+    
+    return image, metadata
+
 def extract_text_with_vision_llm(image_bytes: bytes, mime_type: str = "image/jpeg") -> Optional[str]:
     """
     Groq Vision API ile görselden metin ayıklar.
@@ -65,7 +108,7 @@ def extract_text_with_vision_llm(image_bytes: bytes, mime_type: str = "image/jpe
 
     prompt = (
         "You are an ultra-precise OCR text extraction engine. "
-        "Extract all readable text, titles, numbers, tables, and notes from this document/image verbatim. "
+        "Extract all readable text, titles, numbers, tables, MRZ lines, and notes from this document/image verbatim. "
         "Maintain logical reading order and line breaks. "
         "Do NOT add any meta-commentary, greetings, or explanations. "
         "Output ONLY the exact extracted text."
@@ -109,28 +152,19 @@ def extract_text_with_vision_llm(image_bytes: bytes, mime_type: str = "image/jpe
 
 def extract_text_with_tesseract(image_bytes: bytes) -> Optional[str]:
     """
-    Pillow ve pytesseract kullanarak yerel OCR uygular.
+    Ön işlenmiş görsel ve pytesseract kullanarak yerel OCR uygular.
     """
     try:
-        from PIL import Image, ImageEnhance, ImageFilter
         import pytesseract
 
         _configure_tesseract()
+        processed_image, _ = preprocess_image_for_ocr(image_bytes)
 
-        image = Image.open(io.BytesIO(image_bytes))
-        
-        # Görseli optimize et (Grayscale + Kontrast artırma)
-        if image.mode != "L":
-            image = image.convert("L")
-            
-        enhancer = ImageEnhance.Contrast(image)
-        image = enhancer.enhance(1.5)
-            
         # Tesseract dilleri dene (tur+eng veya varsayılan eng)
         try:
-            text = pytesseract.image_to_string(image, lang="tur+eng")
+            text = pytesseract.image_to_string(processed_image, lang="tur+eng")
         except Exception:
-            text = pytesseract.image_to_string(image)
+            text = pytesseract.image_to_string(processed_image)
             
         text = text.strip()
         if text:
@@ -157,12 +191,16 @@ def validate_image_magic_bytes(image_bytes: bytes) -> bool:
         return True
     return False
 
-def extract_text_from_image_bytes(image_bytes: bytes, mime_type: str = "image/jpeg") -> Tuple[str, str]:
+def extract_text_from_image_bytes(
+    image_bytes: bytes, 
+    mime_type: str = "image/jpeg",
+    return_metadata: bool = False
+) -> Union[Tuple[str, str], Tuple[str, str, Dict[str, Any]]]:
     """
     Verilen görsel baytlarından metin ayıklar.
     Önce Groq Vision modelini dener; ardından Tesseract OCR motoruna geçer.
     
-    Dönüş: (metin, extraction_method)
+    Dönüş: (metin, extraction_method) veya (metin, extraction_method, metadata)
     """
     if not image_bytes:
         raise ValueError("Görsel verisi boş.")
@@ -170,15 +208,26 @@ def extract_text_from_image_bytes(image_bytes: bytes, mime_type: str = "image/jp
     if not validate_image_magic_bytes(image_bytes):
         raise ValueError("Geçersiz görsel formatı (Magic Byte doğrulanamadı). Güvenlik nedeniyle işlem durduruldu.")
 
+    metadata: Dict[str, Any] = {"mime_type": mime_type}
+
     # 1. Groq Vision LLM ile dene (eğer yapılandırılmışsa)
     if _is_groq_vision_available():
         vision_text = extract_text_with_vision_llm(image_bytes, mime_type=mime_type)
         if vision_text and vision_text.strip():
+            metadata["engine"] = "groq_vision"
+            metadata["confidence_estimate"] = "VERY_HIGH"
+            if return_metadata:
+                return vision_text.strip(), "vision_ocr", metadata
             return vision_text.strip(), "vision_ocr"
 
-    # 2. Yerel Tesseract OCR ile dene
+    # 2. Yerel Tesseract OCR ile dene (Ön İşleme Hattı ile)
     tesseract_text = extract_text_with_tesseract(image_bytes)
+    metadata["engine"] = "tesseract_ocr"
+    
     if tesseract_text and tesseract_text.strip():
+        metadata["confidence_estimate"] = "HIGH" if len(tesseract_text) > 100 else "MEDIUM"
+        if return_metadata:
+            return tesseract_text.strip(), "tesseract_ocr", metadata
         return tesseract_text.strip(), "tesseract_ocr"
 
     raise ValueError(

@@ -54,6 +54,10 @@ class AnalysisResponse(BaseModel):
     recommendations: Optional[List[ActionItem]] = []
     cv_analysis: Optional[Dict[str, Any]] = None
     redaction_verification: Optional[Dict[str, Any]] = None  # Maskeleme sonrası ikinci tarama
+    structured_data: Optional[Dict[str, Any]] = None         # Kimlik/Pasaport/Fatura yapılandırılmış alanlar
+    mrz_data: Optional[Dict[str, Any]] = None                # ICAO Doc 9303 MRZ çözümlenmiş veri
+    visual_pii: Optional[List[Dict[str, Any]]] = []          # Biyometrik Fotoğraf, Islak İmza, Çip vb.
+    ocr_metadata: Optional[Dict[str, Any]] = None            # OCR motoru ve ölçekleme meta verileri
 
 
 class TranslationRequest(BaseModel):

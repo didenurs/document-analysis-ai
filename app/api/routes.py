@@ -30,6 +30,7 @@ from app.services.recommendation_service import generate_action_recommendations
 from app.services.metrics_service import record_analysis_metrics, get_system_metrics
 from app.services.webhook_service import dispatch_webhook_event
 from app.services.cv_service import analyze_cv_document
+from app.services.document_extractor import extract_structured_document_data, detect_visual_pii_elements
 from app.models.schemas import WebhookTestRequest, SystemMetricsResponse
 
 router = APIRouter()
@@ -51,7 +52,8 @@ def process_text_pipeline(
     raw_text: str, 
     req_language: Optional[str] = None,
     extraction_method: str = "text",
-    page_count: Optional[int] = None
+    page_count: Optional[int] = None,
+    ocr_metadata: Optional[dict] = None
 ) -> AnalysisResponse:
     if not raw_text or not raw_text.strip():
         raise HTTPException(status_code=400, detail="Metin içeriği boş olamaz.")
@@ -74,9 +76,9 @@ def process_text_pipeline(
         # Çıktı özetini de PII filtresinden geçir (Çift Katmanlı Koruma)
         summary, _, _ = mask_pii_text(raw_summary, mask_mode="starred")
         
-        keywords = extract_keywords(masked_txt, language=lang_code)
         category = predict_category(cleaned_text)  # Ham metin üzerinde kategori tespiti
         category_lbl = get_category_label(category)
+        keywords = extract_keywords(masked_txt, language=lang_code, category=category)
 
         # Üç boyutlu risk: PII varlıkları risk motoruna iletiliyor
         risk_data = analyze_risk(
@@ -145,6 +147,9 @@ def process_text_pipeline(
 
         cv_info = analyze_cv_document(cleaned_text)
 
+        # Bölüm 2 (P1): Yapılandırılmış Doküman Alanları, MRZ ve Görsel PII Tespiti (Ham metin formatı korunarak)
+        structured_info = extract_structured_document_data(raw_text, category=category)
+
         return AnalysisResponse(
             summary=summary,
             keywords=keywords,
@@ -165,6 +170,10 @@ def process_text_pipeline(
             recommendations=recs,
             cv_analysis=cv_info if cv_info.get("is_cv") else None,
             redaction_verification=redaction_verification,
+            structured_data=structured_info.get("fields") if structured_info.get("fields") else None,
+            mrz_data=structured_info.get("mrz_data"),
+            visual_pii=structured_info.get("visual_pii", []),
+            ocr_metadata=ocr_metadata,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analiz sırasında bir sunucu hatası oluştu: {str(e)}")
@@ -225,7 +234,18 @@ async def analyze_image(file: UploadFile = File(...)):
         if len(file_bytes) == 0:
             raise HTTPException(status_code=400, detail="Yüklenen görsel dosyası boş.")
             
-        raw_text, method = extract_text_from_image_bytes(file_bytes, mime_type=mime_type)
+        extracted_res = extract_text_from_image_bytes(
+            file_bytes, 
+            mime_type=mime_type, 
+            return_metadata=True
+        )
+        if isinstance(extracted_res, tuple) and len(extracted_res) == 3:
+            raw_text, method, ocr_meta = extracted_res
+        elif isinstance(extracted_res, tuple) and len(extracted_res) == 2:
+            raw_text, method = extracted_res
+            ocr_meta = None
+        else:
+            raw_text, method, ocr_meta = str(extracted_res), "vision_ocr", None
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
@@ -237,7 +257,7 @@ async def analyze_image(file: UploadFile = File(...)):
             detail="Görsel üzerinden okunabilir metin çıkarılamadı."
         )
         
-    return process_text_pipeline(raw_text, extraction_method=method)
+    return process_text_pipeline(raw_text, extraction_method=method, ocr_metadata=ocr_meta)
 
 @router.post("/translate", response_model=TranslationResponse)
 def translate_endpoint(request: TranslationRequest):

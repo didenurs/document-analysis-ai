@@ -166,3 +166,173 @@ def test_new_pii_social_profile():
     entities = detect_pii_entities(text)
     types = [e["type"] for e in entities]
     assert "SOCIAL_PROFILE" in types, f"linkedin/github SOCIAL_PROFILE olmalı. Bulunanlar: {types}"
+
+
+# ─────────────────────────────────────────────────────────────────
+# Bölüm 2 (P1) Yeni Testler — MRZ, Structured Data, Visual PII, OCR
+# ─────────────────────────────────────────────────────────────────
+
+def test_mrz_parsing_td1_identity_card():
+    """TD1 3-satırlı Kimlik Kartı MRZ çözümleme ve checksum doğrulaması."""
+    from app.services.mrz_service import parse_mrz, calculate_mrz_check_digit
+    
+    # ICAO Doc 9303 TD1 Örneği (T.C. Kimlik Kartı MRZ)
+    sample_id_text = """
+    TÜRKİYE CUMHURİYETİ KİMLİK KARTI
+    Soyadı: YILMAZ Adı: AHMET
+    I<TURA12B345674<<<<<<<<<<<<<<<
+    9001018M3001014TUR123456789012
+    YILMAZ<<AHMET<<<<<<<<<<<<<<<<<
+    """
+    mrz = parse_mrz(sample_id_text)
+    assert mrz is not None, "MRZ tespit edilmeli"
+    assert mrz["format"] == "TD1"
+    assert mrz["document_type"] == "IDENTITY_CARD"
+    assert mrz["document_number"] == "A12B34567"
+    assert mrz["surname"] == "YILMAZ"
+    assert mrz["given_names"] == "AHMET"
+    assert mrz["birth_date"] == "1990-01-01"
+    assert mrz["expiry_date"] == "2030-01-01"
+    assert mrz["sex"] == "M"
+    assert mrz["nationality"] == "TUR"
+    assert mrz["tckn"] == "12345678901"
+
+
+def test_mrz_parsing_td3_passport():
+    """TD3 2-satırlı Pasaport MRZ çözümlemesi."""
+    from app.services.mrz_service import parse_mrz
+    
+    passport_text = """
+    PASAPORT / PASSPORT
+    P<TURYILMAZ<<AHMET<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    U123456780TUR9001018M300101412345678901<<<<<4
+    """
+    mrz = parse_mrz(passport_text)
+    assert mrz is not None, "Pasaport MRZ tespit edilmeli"
+    assert mrz["format"] == "TD3"
+    assert mrz["document_type"] == "PASSPORT"
+    assert mrz["document_number"] == "U12345678"
+    assert mrz["surname"] == "YILMAZ"
+    assert mrz["given_names"] == "AHMET"
+    assert mrz["birth_date"] == "1990-01-01"
+    assert mrz["expiry_date"] == "2030-01-01"
+
+
+def test_structured_document_extraction_identity():
+    """Kimlik kartı metninden yapılandırılmış alan çıkarımı."""
+    from app.services.document_extractor import extract_structured_document_data
+    
+    id_text = """
+    TÜRKİYE CUMHURİYETİ KİMLİK KARTI
+    T.C. Kimlik No: 12345678901
+    Soyadı / Surname: YILMAZ
+    Adı / Given Name: MEHMET ALİ
+    Doğum Tarihi / Date of Birth: 15.08.1992
+    Belge No / Document No: A12B34567
+    Son Geçerlilik / Valid Until: 15.08.2032
+    Cinsiyeti / Sex: Erkek / M
+    Uyruğu / Nationality: T.C.
+    Anne Adı: FATMA  Baba Adı: HASAN
+    """
+    result = extract_structured_document_data(id_text, category="IDENTITY_CARD")
+    assert result["document_type"] == "IDENTITY_CARD"
+    fields = result["fields"]
+    assert fields.get("tckn") == "12345678901"
+    assert fields.get("surname") == "YILMAZ"
+    assert "MEHMET" in fields.get("given_name", "")
+    assert fields.get("birth_date") == "15.08.1992"
+    assert fields.get("document_no") == "A12B34567"
+    assert fields.get("valid_until") == "15.08.2032"
+    assert "Erkek" in fields.get("gender", "")
+    assert fields.get("mother_name") == "FATMA"
+    assert fields.get("father_name") == "HASAN"
+
+
+def test_visual_pii_detection():
+    """Görsel PII unsurlarının (fotoğraf, imza, çip, barkod) tespiti."""
+    from app.services.document_extractor import detect_visual_pii_elements
+    
+    doc_text = """
+    SÜRÜCÜ BELGESİ / DRIVING LICENCE
+    Biyometrik fotoğraf alanı mevcuttur.
+    Sahibinin imzası: [İMZA]
+    Elektronik çip ve hologram güvenlik şeridi bulunur.
+    """
+    visual_items = detect_visual_pii_elements(doc_text)
+    types = [item["type"] for item in visual_items]
+    assert "BIOMETRIC_PHOTO" in types
+    assert "HANDWRITTEN_SIGNATURE" in types
+    assert "SMART_CHIP_HOLOGRAM" in types
+
+
+def test_document_type_aware_keywords():
+    """Kimlik kartı için 'Soyad', 'Surname', 'Turkey' gibi şablon kelimeler filtrelenmeli."""
+    from app.services.keyword_service import extract_keywords
+    
+    id_text = """
+    TÜRKİYE CUMHURİYETİ KİMLİK KARTI
+    Soyad / Surname: KARADENİZ
+    Ad / Given Name: VOLKAN
+    Doğum Tarihi / Date of Birth: 01.01.1990
+    Belge No / Document No: A12B34567
+    Biyometrik Kriptografi ve Yapay Zeka Sertifikasyonu
+    """
+    keywords = extract_keywords(id_text, category="IDENTITY_CARD", top_n=5)
+    lower_kws = [k.lower() for k in keywords]
+    assert "soyad" not in lower_kws
+    assert "surname" not in lower_kws
+    assert "given" not in lower_kws
+    assert "türkiye" not in lower_kws
+    assert "kartı" not in lower_kws
+
+
+def test_image_preprocessing_pipeline():
+    """Görsel ön işleme hattının (upscaling, contrast, grayscale) doğrulanması."""
+    from app.services.ocr_service import preprocess_image_for_ocr
+    from PIL import Image
+    import io
+    
+    # Küçük bir test görseli oluştur (200x100)
+    img = Image.new("RGB", (200, 100), color=(255, 255, 255))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    img_bytes = buf.getvalue()
+    
+    processed_img, metadata = preprocess_image_for_ocr(img_bytes)
+    assert metadata["preprocessed"] is True
+    assert metadata["scale_factor"] > 1.0  # Küçük görsel büyütülmeli
+    assert processed_img.mode == "L"       # Grayscale olmalı
+    assert processed_img.size[0] > 200    # Genişlik artırılmış olmalı
+
+
+def test_end_to_end_pipeline_structured_response():
+    """Routes pipeline'ının structured_data, visual_pii ve mrz_data dönmesini test et."""
+    from fastapi.testclient import TestClient
+    from app.main import app
+    
+    c = TestClient(app)
+    sample_id = """
+    TÜRKİYE CUMHURİYETİ KİMLİK KARTI
+    T.C. Kimlik No: 12345678901
+    Soyadı: KAYA
+    Adı: CAN
+    Doğum Tarihi: 10.10.1995
+    Belge No: B98A76543
+    Geçerlilik: 10.10.2035
+    I<TURB98A765430<<<<<<<<<<<<<<<
+    9510105M3510108TUR123456789010
+    KAYA<<CAN<<<<<<<<<<<<<<<<<<<<<
+    """
+    resp = c.post("/analyze-text", json={"text": sample_id})
+    assert resp.status_code == 200
+    data = resp.json()
+    
+    assert data["category"] == "IDENTITY_CARD"
+    assert "structured_data" in data and data["structured_data"] is not None
+    assert data["structured_data"].get("surname") == "KAYA"
+    assert data["structured_data"].get("tckn") == "12345678901"
+    assert "mrz_data" in data and data["mrz_data"] is not None
+    assert data["mrz_data"]["document_number"] == "B98A76543"
+    assert "visual_pii" in data
+    assert len(data["visual_pii"]) > 0
+

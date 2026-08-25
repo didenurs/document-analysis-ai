@@ -697,7 +697,101 @@ function buildRiskBreakdownHtml(data) {
          + riskCard('🧬', 'Hassas Veri', sens);
 }
 
+
+function buildStructuredDataHtml(data) {
+    const fields = data.structured_data || {};
+    const mrz = data.mrz_data || null;
+    const visualPii = data.visual_pii || [];
+
+    if (Object.keys(fields).length === 0 && !mrz && visualPii.length === 0) {
+        return '';
+    }
+
+    const fieldLabels = {
+        tckn: 'T.C. Kimlik No',
+        surname: 'Soyadı / Surname',
+        given_name: 'Adı / Given Name',
+        birth_date: 'Doğum Tarihi',
+        document_no: 'Belge / Seri No',
+        valid_until: 'Son Geçerlilik',
+        gender: 'Cinsiyet',
+        nationality: 'Uyruk',
+        mother_name: 'Anne Adı',
+        father_name: 'Baba Adı',
+        invoice_no: 'Fatura No',
+        invoice_date: 'Fatura Tarihi',
+        tax_id: 'Vergi No / VKN',
+        total_amount: 'Genel Toplam',
+        vat_amount: 'KDV Tutarı',
+        iban: 'IBAN Numarası',
+        balance: 'Bakiye',
+        contract_title: 'Sözleşme Başlığı',
+        effective_date: 'Yürürlük Tarihi'
+    };
+
+    let fieldItemsHtml = '';
+    for (const [k, v] of Object.entries(fields)) {
+        if (!v) continue;
+        const label = fieldLabels[k] || k.replace(/_/g, ' ').toUpperCase();
+        fieldItemsHtml += `
+            <div class="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-0.5">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">${escapeHtml(label)}</span>
+                <span class="text-xs font-mono font-bold text-blue-300 block select-all">${escapeHtml(String(v))}</span>
+            </div>
+        `;
+    }
+
+    let mrzCardHtml = '';
+    if (mrz) {
+        const isValid = mrz.is_checksum_valid;
+        const badgeCls = isValid ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+        const badgeIcon = isValid ? '✅' : '⚠️';
+        const badgeText = isValid ? 'ICAO Doc 9303 Checksum Doğrulandı' : 'MRZ Ayrıştırıldı';
+        
+        mrzCardHtml = `
+            <div class="p-3 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2 mt-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
+                        <span>📟</span> Makine Okunabilir Alan (MRZ - ${mrz.format || 'ICAO 9303'})
+                    </span>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${badgeCls}">${badgeIcon} ${badgeText}</span>
+                </div>
+                <div class="p-2 rounded bg-slate-950 border border-slate-800/80 font-mono text-[11px] text-emerald-400/90 leading-tight space-y-0.5 select-all">
+                    ${(mrz.raw_lines || []).map(l => `<div>${escapeHtml(l)}</div>`).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    let visualPiiHtml = '';
+    if (visualPii.length > 0) {
+        visualPiiHtml = `
+            <div class="pt-2 border-t border-slate-800/80">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Tespit Edilen Görsel & Biyometrik PII Unsurları:</span>
+                <div class="flex flex-wrap gap-1.5">
+                    ${visualPii.map(v => `<span class="px-2 py-0.5 rounded bg-purple-500/15 border border-purple-500/30 text-purple-300 text-[11px] font-medium">${escapeHtml(v.label || v.type)}</span>`).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    return `
+        <div class="p-4 rounded-xl bg-slate-950/90 border border-blue-500/30 space-y-3 animate-fade-in">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                <h3 class="text-xs sm:text-sm font-bold text-blue-400 flex items-center gap-2">
+                    <span>🪪</span> Yapılandırılmış Doküman Verisi & Resmi Alanlar
+                </h3>
+                <span class="text-[10px] font-semibold text-slate-400">OCR & Document Intelligence</span>
+            </div>
+            ${fieldItemsHtml ? `<div class="grid grid-cols-2 sm:grid-cols-3 gap-2">${fieldItemsHtml}</div>` : ''}
+            ${mrzCardHtml}
+            ${visualPiiHtml}
+        </div>
+    `;
+}
+
 function getRiskBadge(level, score) {
+
 
     if (level === 'High') {
         return `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-500/15 border border-rose-500/40 text-rose-400 font-extrabold text-xs">🚨 Yüksek Risk (Skor: ${score})</span>`;
@@ -901,6 +995,8 @@ function displayResults(data, autoScrollToMasked = false) {
                     <div class="flex flex-wrap gap-1.5 pt-2">${piiBadgesHtml}</div>
                 </div>
             </div>
+
+            ${buildStructuredDataHtml(data)}
 
             ${anomalyCardHtml}
 
