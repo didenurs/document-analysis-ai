@@ -8,20 +8,29 @@ def is_valid_tckn(tckn: str) -> bool:
         return False
     
     digits = [int(d) for d in tckn]
-    
-    # 1, 3, 5, 7 ve 9. hanelerin toplamının 7 katından 2, 4, 6 ve 8. hanelerin toplamı çıkarıldığında
-    # elde edilen sonucun 10'a bölümünden kalan 10. haneyi vermelidir.
     odd_sum = sum(digits[0:9:2])
     even_sum = sum(digits[1:8:2])
     tenth_digit = ((odd_sum * 7) - even_sum) % 10
     if tenth_digit != digits[9]:
         return False
         
-    # İlk 10 hanenin toplamının 10'a bölümünden kalan 11. haneyi vermelidir.
     if sum(digits[:10]) % 10 != digits[10]:
         return False
         
     return True
+
+# IBAN Doğrulama Algoritması (ISO 7064 Mod 97-10)
+def is_valid_iban(iban: str) -> bool:
+    """ISO 7064 Mod 97-10 IBAN doğrulama algoritması."""
+    clean = re.sub(r'[^A-Z0-9]', '', iban.upper())
+    if not clean or len(clean) < 15 or len(clean) > 34:
+        return False
+    rearranged = clean[4:] + clean[:4]
+    numeric_str = "".join(str(ord(ch) - 55) if ch.isalpha() else ch for ch in rearranged)
+    try:
+        return int(numeric_str) % 97 == 1
+    except ValueError:
+        return False
 
 # Regex Kalıpları
 PATTERNS = {
@@ -31,7 +40,12 @@ PATTERNS = {
     "IBAN": r'\bTR\d{2}\s?(?:\d{4}\s?){5}\d{2}\b',
     "CREDIT_CARD": r'\b(?:\d{4}[ -]?){3}\d{4}\b',
     "IP_ADDRESS": r'\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b',
-    "API_KEY": r'\b(?:gsk_[a-zA-Z0-9]{20,}|Bearer\s+[a-zA-Z0-9-_.]{20,}|ghp_[a-zA-Z0-9]{36}|AIza[0-9A-Za-z-_]{35})\b'
+    "API_KEY": r'\b(?:gsk_[a-zA-Z0-9]{20,}|Bearer\s+[a-zA-Z0-9-_.]{20,}|ghp_[a-zA-Z0-9]{36}|AIza[0-9A-Za-z-_]{35})\b',
+    "BIRTH_DATE": r'\b(?:0[1-9]|[12][0-9]|3[01])[\.\/\-](?:0[1-9]|1[0-2])[\.\/\-](?:19|20)\d{2}\b',
+    "LICENSE_PLATE": r'\b(?:0[1-9]|[1-7][0-9]|8[01])\s?[A-Z]{1,3}\s?\d{2,4}\b',
+    "SERIAL_NO": r'\b[A-Z]\d{2}\s?[A-Z0-9]\d{5}\b',
+    "MRZ": r'I<TUR[A-Z0-9<]+',
+    "BIOMETRIC_NOTICE": r'\b(?:biyometrik|parmak\s?izi|yüz\s?tanıma|biyometrik\s?imza|retina\s?taraması)\b'
 }
 
 # Türkçe İsim & Unvan Eşleştirme Kalıbı
@@ -49,15 +63,23 @@ def _mask_value(value: str, entity_type: str, mode: str = "starred") -> str:
         "CREDIT_CARD": "KREDİ KARTI",
         "IP_ADDRESS": "IP ADRESİ",
         "NAME": "KİŞİ",
-        "API_KEY": "API ANAHTARI"
+        "API_KEY": "API ANAHTARI",
+        "BIRTH_DATE": "DOĞUM TARİHİ",
+        "LICENSE_PLATE": "ARAÇ PLAKASI",
+        "SERIAL_NO": "SERİ NO",
+        "PARENTS_NAME": "ANNE/BABA ADI",
+        "GENDER": "CİNSİYET",
+        "NATIONALITY": "UYRUK",
+        "ADDRESS": "ADRES",
+        "MRZ": "MRZ SATIRI",
+        "BIOMETRIC_NOTICE": "BİYOMETRİK VERİ"
     }
     label = LABEL_MAP.get(entity_type, entity_type)
 
     if mode == "redact":
-        return f"[{label} MASKELENDİ]"
+        return f"[{label}_MASKELENDİ]"
     elif mode == "tag":
         return f"<{entity_type}>"
-
         
     # Starred (*) Modu
     if entity_type == "TCKN":
@@ -72,7 +94,6 @@ def _mask_value(value: str, entity_type: str, mode: str = "starred") -> str:
             masked_name = name[:2] + "***" if len(name) >= 2 else (name[0] + "***" if len(name) == 1 else "***")
             return f"{masked_name}@{domain}"
         return "***@***.***"
-
         
     elif entity_type == "PHONE":
         clean = re.sub(r'\D', '', val)
@@ -102,20 +123,23 @@ def _mask_value(value: str, entity_type: str, mode: str = "starred") -> str:
     elif entity_type == "API_KEY":
         return f"{val[:6]}*******************"
         
+    elif entity_type in ("BIRTH_DATE", "SERIAL_NO", "LICENSE_PLATE", "PARENTS_NAME", "ADDRESS", "MRZ", "BIOMETRIC_NOTICE"):
+        return f"{val[0]}***{val[-1]}" if len(val) >= 2 else "***"
+        
     return f"[{entity_type}]"
 
 
 def detect_pii_entities(text: str) -> List[Dict[str, Any]]:
     """
-    Metin içerisindeki TCKN, E-posta, Telefon, IBAN, Kredi Kartı, IP ve İsim gibi
-    hassas kişisel verileri tespit eder ve listeler.
+    Metin içerisindeki TCKN, E-posta, Telefon, IBAN, Kredi Kartı, IP, İsim, Doğum Tarihi,
+    Adres, Plaka, Seri No ve Biyometrik İbareleri tespit eder ve listeler.
     """
     if not text or not text.strip():
         return []
 
     entities = []
     
-    # 1. TCKN Tespiti (Algoritma doğrulamalı)
+    # 1. TCKN Tespiti (Algoritma doğrulamalı - Confidence: 0.98)
     for match in re.finditer(PATTERNS["TCKN"], text):
         tckn_candidate = match.group()
         if is_valid_tckn(tckn_candidate):
@@ -124,40 +148,45 @@ def detect_pii_entities(text: str) -> List[Dict[str, Any]]:
                 "text": tckn_candidate,
                 "start": match.start(),
                 "end": match.end(),
-                "label": "T.C. Kimlik No"
+                "label": "T.C. Kimlik No",
+                "confidence_score": 0.98
             })
             
-    # 2. E-posta Tespiti
+    # 2. E-posta Tespiti (Confidence: 0.95)
     for match in re.finditer(PATTERNS["EMAIL"], text):
         entities.append({
             "type": "EMAIL",
             "text": match.group(),
             "start": match.start(),
             "end": match.end(),
-            "label": "E-posta Adresi"
+            "label": "E-posta Adresi",
+            "confidence_score": 0.95
         })
 
-    # 3. IBAN Tespiti
+    # 3. IBAN Tespiti (Algoritma / Format doğrulamalı)
     for match in re.finditer(PATTERNS["IBAN"], text, re.IGNORECASE):
+        candidate = match.group()
+        valid = is_valid_iban(candidate)
         entities.append({
             "type": "IBAN",
-            "text": match.group(),
+            "text": candidate,
             "start": match.start(),
             "end": match.end(),
-            "label": "Banka IBAN"
+            "label": "Banka IBAN",
+            "confidence_score": 0.98 if valid else 0.80
         })
 
     # 4. Kredi Kartı Tespiti
     for match in re.finditer(PATTERNS["CREDIT_CARD"], text):
         card = match.group().replace(" ", "").replace("-", "")
-        # TCKN veya IBAN ile çakışmasın
         if len(card) == 16 and not any(e["start"] <= match.start() < e["end"] for e in entities):
             entities.append({
                 "type": "CREDIT_CARD",
                 "text": match.group(),
                 "start": match.start(),
                 "end": match.end(),
-                "label": "Kredi Kartı No"
+                "label": "Kredi Kartı No",
+                "confidence_score": 0.90
             })
 
     # 5. Telefon Numarası Tespiti
@@ -170,7 +199,8 @@ def detect_pii_entities(text: str) -> List[Dict[str, Any]]:
                 "text": raw_phone,
                 "start": match.start(),
                 "end": match.end(),
-                "label": "Telefon Numarası"
+                "label": "Telefon Numarası",
+                "confidence_score": 0.90
             })
 
     # 6. IP Adresi Tespiti
@@ -180,7 +210,8 @@ def detect_pii_entities(text: str) -> List[Dict[str, Any]]:
             "text": match.group(),
             "start": match.start(),
             "end": match.end(),
-            "label": "IP Adresi"
+            "label": "IP Adresi",
+            "confidence_score": 0.92
         })
 
     # 7. API Key Tespiti
@@ -190,19 +221,77 @@ def detect_pii_entities(text: str) -> List[Dict[str, Any]]:
             "text": match.group(),
             "start": match.start(),
             "end": match.end(),
-            "label": "API Anahtarı / Token"
+            "label": "API Anahtarı / Token",
+            "confidence_score": 0.99
         })
 
     # 8. Unvanlı İsim Tespiti
     for match in re.finditer(NAME_TITLE_PATTERN, text):
-        full_match = match.group()
-        name_part = match.group(1)
         entities.append({
             "type": "NAME",
-            "text": name_part,
+            "text": match.group(1),
             "start": match.start(1),
             "end": match.end(1),
-            "label": "Kişi Adı (Unvanlı)"
+            "label": "Kişi Adı (Unvanlı)",
+            "confidence_score": 0.85
+        })
+
+    # 9. Doğum Tarihi Tespiti
+    for match in re.finditer(PATTERNS["BIRTH_DATE"], text):
+        if not any(e["start"] <= match.start() < e["end"] for e in entities):
+            entities.append({
+                "type": "BIRTH_DATE",
+                "text": match.group(),
+                "start": match.start(),
+                "end": match.end(),
+                "label": "Doğum Tarihi",
+                "confidence_score": 0.85
+            })
+
+    # 10. Araç Plakası Tespiti
+    for match in re.finditer(PATTERNS["LICENSE_PLATE"], text):
+        if not any(e["start"] <= match.start() < e["end"] for e in entities):
+            entities.append({
+                "type": "LICENSE_PLATE",
+                "text": match.group(),
+                "start": match.start(),
+                "end": match.end(),
+                "label": "Araç Plakası",
+                "confidence_score": 0.80
+            })
+
+    # 11. Kimlik Seri No Tespiti
+    for match in re.finditer(PATTERNS["SERIAL_NO"], text):
+        if not any(e["start"] <= match.start() < e["end"] for e in entities):
+            entities.append({
+                "type": "SERIAL_NO",
+                "text": match.group(),
+                "start": match.start(),
+                "end": match.end(),
+                "label": "Kimlik Seri No",
+                "confidence_score": 0.85
+            })
+
+    # 12. MRZ Satırı Tespiti
+    for match in re.finditer(PATTERNS["MRZ"], text):
+        entities.append({
+            "type": "MRZ",
+            "text": match.group(),
+            "start": match.start(),
+            "end": match.end(),
+            "label": "MRZ (Makine Okunabilir Alan)",
+            "confidence_score": 0.99
+        })
+
+    # 13. Biyometrik Veri İbaresı Tespiti
+    for match in re.finditer(PATTERNS["BIOMETRIC_NOTICE"], text, re.IGNORECASE):
+        entities.append({
+            "type": "BIOMETRIC_NOTICE",
+            "text": match.group(),
+            "start": match.start(),
+            "end": match.end(),
+            "label": "Biyometrik Veri İbaresi",
+            "confidence_score": 0.90
         })
 
     # Çakışan varlıkları filtrele ve başlangıç sırasına göre diz
@@ -219,23 +308,27 @@ def detect_pii_entities(text: str) -> List[Dict[str, Any]]:
 
 def calculate_kvkk_report(entities: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
-    Tespit edilen kişisel verilerin türüne ve sayısına göre
+    Tespit edilen kişisel verilerin türüne, sayısına ve güven skorlarına göre
     KVKK / GDPR uyumluluk ve risk raporu oluşturur.
     """
     total = len(entities)
     breakdown = {}
+    confidence_warnings = []
     
     for ent in entities:
         t = ent["type"]
         breakdown[t] = breakdown.get(t, 0) + 1
+        score = ent.get("confidence_score", 1.0)
+        if score < 0.85:
+            confidence_warnings.append(f"Düşük güven skorlu PII tespiti ({ent.get('label')}: {ent.get('text')})")
 
-    has_critical = any(t in breakdown for t in ["TCKN", "CREDIT_CARD", "IBAN", "API_KEY"])
+    has_critical = any(t in breakdown for t in ["TCKN", "CREDIT_CARD", "IBAN", "API_KEY", "MRZ", "BIOMETRIC_NOTICE"])
     
     if total == 0:
         status = "🛡️ Güvenli (Hassas Kişisel Veri Tespit Edilmedi)"
         risk_level = "Low"
     elif has_critical:
-        status = f"🚨 Kritik KVKK İhlali ({total} Hassas Veri Bulundu: TCKN/Finans/Siber)"
+        status = f"🚨 Kritik KVKK İhlali ({total} Hassas Veri Bulundu: TCKN/Finans/Siber/Biyometrik)"
         risk_level = "High"
     else:
         status = f"⚠️ Dikkat ({total} Kişisel Veri Tespit Edildi)"
@@ -245,7 +338,8 @@ def calculate_kvkk_report(entities: List[Dict[str, Any]]) -> Dict[str, Any]:
         "status": status,
         "risk_level": risk_level,
         "total_entities": total,
-        "breakdown": breakdown
+        "breakdown": breakdown,
+        "confidence_warnings": confidence_warnings
     }
 
 

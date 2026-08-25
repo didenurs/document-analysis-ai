@@ -141,6 +141,22 @@ def extract_text_with_tesseract(image_bytes: bytes) -> Optional[str]:
 
     return None
 
+def validate_image_magic_bytes(image_bytes: bytes) -> bool:
+    """PNG, JPEG, WEBP, BMP, TIFF görsel başlıklarını kontrol eder."""
+    if not image_bytes or len(image_bytes) < 4:
+        return False
+    if image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+        return True
+    if image_bytes.startswith(b"\xff\xd8\xff"):
+        return True
+    if image_bytes.startswith(b"RIFF") and b"WEBP" in image_bytes[:16]:
+        return True
+    if image_bytes.startswith(b"BM"):
+        return True
+    if image_bytes.startswith(b"II*\x00") or image_bytes.startswith(b"MM\x00*"):
+        return True
+    return False
+
 def extract_text_from_image_bytes(image_bytes: bytes, mime_type: str = "image/jpeg") -> Tuple[str, str]:
     """
     Verilen görsel baytlarından metin ayıklar.
@@ -150,6 +166,9 @@ def extract_text_from_image_bytes(image_bytes: bytes, mime_type: str = "image/jp
     """
     if not image_bytes:
         raise ValueError("Görsel verisi boş.")
+
+    if not validate_image_magic_bytes(image_bytes):
+        raise ValueError("Geçersiz görsel formatı (Magic Byte doğrulanamadı). Güvenlik nedeniyle işlem durduruldu.")
 
     # 1. Groq Vision LLM ile dene (eğer yapılandırılmışsa)
     if _is_groq_vision_available():

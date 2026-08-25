@@ -44,10 +44,9 @@ def test_mask_pii_text_modes():
 
     # 2. Redact modu
     masked_redact, _, _ = mask_pii_text(SAMPLE_PII_TEXT, mask_mode="redact")
-    assert "[TCKN MASKELENDİ]" in masked_redact
-    assert "[E-POSTA MASKELENDİ]" in masked_redact
-    assert "[IP ADRESİ MASKELENDİ]" in masked_redact
-
+    assert "[TCKN_MASKELENDİ]" in masked_redact
+    assert "[E-POSTA_MASKELENDİ]" in masked_redact
+    assert "[IP ADRESİ_MASKELENDİ]" in masked_redact
 
     # 3. Tag modu
     masked_tag, _, _ = mask_pii_text(SAMPLE_PII_TEXT, mask_mode="tag")

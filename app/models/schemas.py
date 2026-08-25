@@ -12,12 +12,14 @@ class PIIEntity(BaseModel):
     masked_value: str
     start: Optional[int] = None
     end: Optional[int] = None
+    confidence_score: Optional[float] = 1.0
 
 class KVKKReport(BaseModel):
     status: str
     risk_level: str
     total_entities: int
     breakdown: Dict[str, int]
+    confidence_warnings: Optional[List[str]] = []
 
 class AnomalyReport(BaseModel):
     has_anomaly: bool
@@ -47,6 +49,7 @@ class AnalysisResponse(BaseModel):
     kvkk_report: Optional[KVKKReport] = None
     anomaly_report: Optional[AnomalyReport] = None
     recommendations: Optional[List[ActionItem]] = []
+    cv_analysis: Optional[Dict[str, Any]] = None
 
 
 class TranslationRequest(BaseModel):

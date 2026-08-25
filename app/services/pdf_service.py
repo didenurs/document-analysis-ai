@@ -19,6 +19,9 @@ def extract_text_from_pdf(
     if not file_bytes:
         raise ValueError("Yüklenen dosya boş.")
 
+    if not file_bytes.startswith(b"%PDF-"):
+        raise ValueError("Geçersiz PDF dosya yapısı (Magic Byte doğrulanamadı). Güvenlik nedeniyle işlem durduruldu.")
+
     try:
         text_parts = []
         used_ocr = False

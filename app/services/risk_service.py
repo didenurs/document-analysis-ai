@@ -34,16 +34,29 @@ LOW_RISK_KEYWORDS = [
     "guvenlik alarmi", "sistem anomalisi", "acil güncelleme", "acil guncelleme", "güvenlik tedbiri"
 ]
 
+RISK_MITIGATORS = [
+    "historical attack", "historical report", "past incident", "no systems affected", 
+    "no current threat", "remediated", "resolved", "simulation", "test scenario", 
+    "gecmis olay", "etkilenen sistem yok", "gecmiste kalmis", "simulasyon", "test raporu",
+    "giderildi", "cozuldu"
+]
+
+RISK_AMPLIFIERS = [
+    "active attack", "currently compromised", "ongoing breach", "unprecedented attack",
+    "urgent action required", "devam eden saldiri", "halihazırda", "canli sistemler etkilendi",
+    "kritik tehdit devam ediyor"
+]
+
 def _normalize_text(text: str) -> str:
     return text.replace("İ", "i").replace("I", "ı").lower()
 
 def analyze_risk(text: str) -> dict:
     """
-    Metindeki risk göstergelerini çok dilli (Türkçe & İngilizce) tam kelime grubu eşleşmesi
-    ve ağırlıklı skorlama ile analiz eder.
+    Metindeki risk göstergelerini çok dilli (Türkçe & İngilizce) tam kelime grubu eşleşmesi,
+    bağlamsal hafifleticiler (tarihi olay/simülasyon) ve aktif arttırıcılar ile analiz eder.
     """
     if not text or not text.strip():
-        return {"risk_score": 0, "risk_level": "Low"}
+        return {"risk_score": 0, "risk_level": "Low", "incident_status": "Genel Doküman"}
         
     text_normalized = _normalize_text(text)
     
@@ -62,12 +75,27 @@ def analyze_risk(text: str) -> dict:
         pattern = rf"\b{re.escape(_normalize_text(kw))}\b"
         low_count += len(re.findall(pattern, text_normalized))
     
+    mitigator_count = sum(1 for kw in RISK_MITIGATORS if _normalize_text(kw) in text_normalized)
+    amplifier_count = sum(1 for kw in RISK_AMPLIFIERS if _normalize_text(kw) in text_normalized)
+
     # Ağırlıklı risk skoru hesaplama (High: 3 puan, Medium: 2 puan, Low: 1 puan)
-    weighted_score = (high_count * 3) + (med_count * 2) + (low_count * 1)
+    raw_score = (high_count * 3) + (med_count * 2) + (low_count * 1)
     
-    if weighted_score == 0:
-        level = "Low"
-    elif weighted_score <= 4:
+    # Bağlamsal hafifletme: Eğer olay geçmişe ait veya simülasyon ise ve aktif tehdit yoksa skoru yarıya indir
+    if mitigator_count > 0 and amplifier_count == 0:
+        weighted_score = max(1, int(raw_score * 0.5))
+        incident_status = "Tarihi / Çözülmüş Rapor (Aktif Tehdit Yok)"
+    elif amplifier_count > 0:
+        weighted_score = raw_score + (amplifier_count * 3)
+        incident_status = "🚨 Aktif Canlı Saldırı / Olay"
+    elif raw_score > 0:
+        weighted_score = raw_score
+        incident_status = "Potansiyel Risk / Analiz Raporu"
+    else:
+        weighted_score = 0
+        incident_status = "Düşük Risk / Genel Doküman"
+
+    if weighted_score == 0 or weighted_score <= 4:
         level = "Low"
     elif weighted_score <= 10:
         level = "Medium"
@@ -76,5 +104,7 @@ def analyze_risk(text: str) -> dict:
         
     return {
         "risk_score": weighted_score,
-        "risk_level": level
+        "risk_level": level,
+        "incident_status": incident_status,
+        "is_mitigated": mitigator_count > 0 and amplifier_count == 0
     }

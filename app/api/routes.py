@@ -1,3 +1,4 @@
+import os
 from typing import Optional
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from app.models.schemas import (
@@ -28,6 +29,7 @@ from app.services.anomaly_service import detect_document_anomalies
 from app.services.recommendation_service import generate_action_recommendations
 from app.services.metrics_service import record_analysis_metrics, get_system_metrics
 from app.services.webhook_service import dispatch_webhook_event
+from app.services.cv_service import analyze_cv_document
 from app.models.schemas import WebhookTestRequest, SystemMetricsResponse
 
 router = APIRouter()
@@ -84,7 +86,8 @@ def process_text_pipeline(
                 label=e["label"],
                 masked_value=e["masked_value"],
                 start=e.get("start"),
-                end=e.get("end")
+                end=e.get("end"),
+                confidence_score=e.get("confidence_score", 1.0)
             )
             for e in entity_dicts
         ]
@@ -93,7 +96,8 @@ def process_text_pipeline(
             status=kvkk_dict["status"],
             risk_level=kvkk_dict["risk_level"],
             total_entities=kvkk_dict["total_entities"],
-            breakdown=kvkk_dict["breakdown"]
+            breakdown=kvkk_dict["breakdown"],
+            confidence_warnings=kvkk_dict.get("confidence_warnings", [])
         )
 
         # Faz 5: Anomali & Sahtecilik Tespiti
@@ -115,6 +119,8 @@ def process_text_pipeline(
             pii_count=kvkk_dict["total_entities"]
         )
 
+        cv_info = analyze_cv_document(cleaned_text)
+
         return AnalysisResponse(
             summary=summary,
             keywords=keywords,
@@ -130,7 +136,8 @@ def process_text_pipeline(
             masked_text=masked_txt,
             kvkk_report=kvkk_rep,
             anomaly_report=anomaly_rep,
-            recommendations=recs
+            recommendations=recs,
+            cv_analysis=cv_info if cv_info.get("is_cv") else None
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analiz sırasında bir sunucu hatası oluştu: {str(e)}")
@@ -140,9 +147,17 @@ def process_text_pipeline(
 def analyze_text(request: TextAnalysisRequest):
     return process_text_pipeline(request.text, req_language=request.language, extraction_method="text")
 
+def sanitize_filename(filename: Optional[str]) -> str:
+    """Path traversal (../) ve null-byte karakterleri temizler."""
+    if not filename:
+        return "unnamed_file"
+    clean_name = os.path.basename(filename).replace("\x00", "").replace("..", "").strip()
+    return clean_name or "unnamed_file"
+
 @router.post("/analyze-pdf", response_model=AnalysisResponse)
 async def analyze_pdf(file: UploadFile = File(...)):
-    if not file.filename or not file.filename.lower().endswith('.pdf'):
+    safe_filename = sanitize_filename(file.filename)
+    if not safe_filename.lower().endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Lütfen geçerli bir PDF dosyası yükleyin.")
     
     try:
