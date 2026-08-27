@@ -530,14 +530,13 @@ async function downloadExport(format) {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        const defaultFilename = (format === 'masked-pdf') ? 'maskelenmis_dokuman.pdf' : `doc_analysis_report.${format}`;
+        const defaultFilename = `doc_analysis_report.${format}`;
         a.download = defaultFilename;
         document.body.appendChild(a);
         a.click();
         a.remove();
         window.URL.revokeObjectURL(url);
-        const formatLabel = format === 'masked-pdf' ? 'Maskelenmiş PDF' : `.${format.toUpperCase()}`;
-        showToast(`Doküman / Rapor ${formatLabel} olarak indirildi!`, 'success');
+        showToast(`Doküman / Rapor .${format.toUpperCase()} olarak indirildi!`, 'success');
     } catch (err) {
         showToast(err.message, 'error');
     }
@@ -1025,13 +1024,10 @@ function displayResults(data, autoScrollToMasked = false) {
                             <span>🔒</span> İşlenmiş Doküman Metni (PII Maskeli)
                         </span>
                     </div>
-                    <div class="flex flex-wrap gap-1.5">
+                    <div class="flex gap-2">
                         <button id="toggle-mask-btn" onclick="toggleMaskedTextView()" class="text-xs font-semibold px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:bg-amber-500/30 transition">👁️ Orijinal Metni Gör</button>
-                        <button id="copy-masked-btn" onclick="copyMaskedDocument()" class="text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition shadow shadow-emerald-600/30 flex items-center gap-1">
+                        <button id="copy-masked-btn" onclick="copyMaskedDocument()" class="text-xs font-bold px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition shadow shadow-emerald-600/30 flex items-center gap-1">
                             📋 Metni Kopyala
-                        </button>
-                        <button id="download-masked-pdf-btn" onclick="downloadExport('masked-pdf')" class="text-xs font-bold px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition shadow shadow-blue-600/30 flex items-center gap-1">
-                            📥 Maskelenmiş PDF İndir
                         </button>
                     </div>
                 </div>
